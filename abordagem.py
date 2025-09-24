@@ -3,6 +3,10 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime, date
+import re
+import base64
+from pathlib import Path
+from typing import Optional
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -15,32 +19,91 @@ st.set_page_config(
 # --- CONSTANTE GLOBAL COM O LINK DA PLANILHA ---
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1b2GOAOIN6mvgLH1rpvRD1vF4Ro9VOqylKkXaUTAq0Ro/edit"
 
-# --- MAPEAMENTO ESTACAO -> LOCAL ---
-MAPEAMENTO_LOCAL = {
-    "RFeye002093 - ANATEL": "Anatel",
-    "RFeye002303 - PARQUE DA CIDADE": "Parque da Cidade",
-    "RFeye002315 - DOCAS": "Docas",
-    "RFeye002012 - OUTEIRO": "Terminal de Outeiro",
-    "RFeye002175 - ALDEIA": "Aldeia",
-    "RFeye002129 - MANGUEIRINHO": "Mangueirinho",
+# --- MAPEAMENTO RFeye -> LOCAL (região) ---
+MAPEAMENTO_CODIGO = {
+    "RFeye002093": "Anatel",
+    "RFeye002303": "Parque da Cidade",
+    "RFeye002315": "Docas",
+    "RFeye002012": "Terminal de Outeiro",
+    "RFeye002175": "Aldeia",
+    "RFeye002129": "Mangueirinho",
 }
+
+# Opções fixas de Identificação (edição)
+IDENT_OPCOES = [
+    "Sinal de dados",
+    "Comunicação (voz) relacionada ao evento",
+    "Comunicação (voz) não relacionada ao evento",
+    "Sinal não relacionado ao evento",
+    "Espúrio ou Produto de Intermodulação",
+    "Ruído",
+    "Não identificado",
+]
+
+# --- UTILITÁRIOS PARA LOGO (BASE64) ---
+def _img_b64(path: str) -> Optional[str]:
+    p = Path(path)
+    if not p.exists():
+        return None
+    return base64.b64encode(p.read_bytes()).decode("utf-8")
+
+def render_header(titulo: str, esquerda: str = "logo.png", direita: str = "anatel.png"):
+    left_b64  = _img_b64(esquerda)
+    right_b64 = _img_b64(direita)
+    left_tag  = f'<img src="data:image/png;base64,{left_b64}" alt="Logo esquerda">' if left_b64 else ""
+    right_tag = f'<img src="data:image/png;base64,{right_b64}" alt="Logo direita">' if right_b64 else ""
+    st.markdown(
+        f"""
+        <div class="header-logos">
+            {left_tag}
+            <h2>{titulo}</h2>
+            {right_tag}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 # --- CSS CUSTOMIZADO ---
 st.markdown("""
 <style>
+    /* Painel central mais estreito */
+    .block-container {
+      max-width: 760px;       /* ajuste aqui se quiser mais estreito/largo */
+      padding-top: 0.75rem;
+      padding-bottom: 0.75rem;
+      margin: 0 auto;
+    }
+
     .stApp { background-color: #D7D6D4; }
     #MainMenu, footer, header { visibility: hidden; }
     div[data-testid="stDivider"] { margin-top: -1.5rem !important; }
-    .title-container { display: flex; align-items: center; justify-content: center; height: 100%; }
-    .title-container h2, h1, h2, h3, h4, h5, h6 { margin: 0; font-size: 2.2em; text-align: center; color: #1A311F; font-weight: bold; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2); }
 
-    /* Estilo padrão dos botões grandes do app (inclui menu) */
+    /* Cabeçalho responsivo (logos + título) */
+    .header-logos {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      text-align: center;
+      margin-bottom: 0.5rem;
+    }
+    .header-logos img { height: 56px; }
+    .header-logos h2 {
+      margin: 0;
+      color: #1A311F;
+      font-weight: 700;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+      font-size: 2rem;
+    }
+
+    /* Botões padrão (inclui menu e submits) em gradiente azul */
     .stButton>button {
         width: 100%; height: 3.5em; font-size: 1.9em; font-weight: bold; margin-bottom: 10px;
         border-radius: 8px; border: 3.4px solid #54515c;
         background: linear-gradient(to bottom, #14337b, #4464A7); color: white;
         transition: all 0.2s ease-in-out; text-align: center; display: flex; align-items: center; justify-content: center;
-        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
     }
     .stButton>button:hover {
         background: linear-gradient(to bottom, #14337b, #4464A7); color: white; border-color: white;
@@ -53,33 +116,22 @@ st.markdown("""
     a[data-testid="stLinkButton"],
     div[data-testid="stLinkButtonContainer"] a,
     a[href*="translate.google.com"] {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        width: 100% !important;
-        height: 4.2em !important;
-        font-size: 1.9em !important;
-        font-weight: 800 !important;
-        border-radius: 8px !important;
-        border: 3.4px solid #3b6e3c !important;
+        display: flex !important; align-items: center !important; justify-content: center !important;
+        width: 100% !important; height: 2.3em !important; font-size: 1.9em !important; font-weight: 800 !important;
+        border-radius: 8px !important; border: 3.4px solid #3b6e3c !important;
         background-image: linear-gradient(to bottom, #2e7d32, #66bb6a) !important;
-        color: #ffffff !important;
-        text-decoration: none !important;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.3) !important;
-        transition: all 0.2s ease-in-out !important;
+        color: #ffffff !important; text-decoration: none !important;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.3) !important; transition: all 0.2s ease-in-out !important;
     }
     div[data-testid="stLinkButton"] a:hover,
     a[data-testid="stLinkButton"]:hover,
     div[data-testid="stLinkButtonContainer"] a:hover,
     a[href*="translate.google.com"]:hover {
         background-image: linear-gradient(to bottom, #2e7d32, #81c784) !important;
-        border-color: #ffffff !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 4px 4px 8px rgba(0,0,0,0.4) !important;
-        color: #ffffff !important;
+        border-color: #ffffff !important; transform: translateY(-2px) !important;
+        box-shadow: 4px 4px 8px rgba(0,0,0,0.4) !important; color: #ffffff !important;
     }
 
-    /* AVISO de confirmação */
     .confirm-warning {
         background: linear-gradient(to bottom, #d9534f, #c9302c);
         color: white; font-weight: bold; text-align: center; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;
@@ -89,31 +141,29 @@ st.markdown("""
     .details-card h4 { color: #1A311F; margin-bottom: 10px; }
     .details-card p { font-size: 1.1em; line-height: 1.6; }
 
-    /* === Botões de SUBMIT (Registrar Emissão / Registrar Ocorrência) iguais ao Voltar === */
+    /* Submits de forms no mesmo gradiente azul */
     div[aria-label="form_nova_emissao"] .stButton > button,
     form[aria-label="form_nova_emissao"] .stButton > button,
     div[aria-label="form_bsr_erb"] .stButton > button,
-    form[aria-label="form_bsr_erb"] .stButton > button {
-        background: linear-gradient(to bottom, #14337b, #4464A7);
-        color: #FFFFFF;
-        font-weight: bold;
-        border: 3.4px solid #54515c;
-        border-radius: 8px;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+    form[aria-label="form_bsr_erb"] .stButton > button,
+    form[aria-label="form_editar_pendente"] .stButton > button {
+        background: linear-gradient(to bottom, #14337b, #4464A7); color: #FFFFFF; font-weight: bold;
+        border: 3.4px solid #54515c; border-radius: 8px; box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
     }
-    div[aria-label="form_nova_emissao"] .stButton > button:hover,
+    form[aria-label="form_editar_pendente"] .stButton > button:hover,
     form[aria-label="form_nova_emissao"] .stButton > button:hover,
-    div[aria-label="form_bsr_erb"] .stButton > button:hover,
     form[aria-label="form_bsr_erb"] .stButton > button:hover {
-        background: linear-gradient(to bottom, #14337b, #4464A7);
-        color: #FFFFFF;
-        border-color: #FFFFFF;
-        box-shadow: 4px 4px 8px rgba(0,0,0,0.4);
-        transform: translateY(-2px);
+        background: linear-gradient(to bottom, #14337b, #4464A7); color: #FFFFFF; border-color: #FFFFFF;
+        box-shadow: 4px 4px 8px rgba(0,0,0,0.4); transform: translateY(-2px);
     }
 
+    /* Mobile tweaks */
     @media (max-width: 640px) {
-        .block-container { padding: 2rem 1.5rem 1rem 1.5rem; }
+      .block-container { max-width: 100%; padding: 0.5rem 0.75rem; }
+      .header-logos { gap: 8px; }
+      .header-logos img { height: 40px; }
+      .header-logos h2 { font-size: 1.5rem; }
+      .stButton > button { height: 3.2em; font-size: 1.3em; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -129,7 +179,6 @@ def get_gspread_client():
     return gspread.authorize(scoped_creds)
 
 # --- UTILITÁRIOS ---
-
 def _first_col_match(columns, *preds):
     for c in columns:
         s = c.strip().lower()
@@ -138,12 +187,25 @@ def _first_col_match(columns, *preds):
                 return c
     return None
 
+def _extract_rfeye_code(estacao_str: str) -> str:
+    """Extrai 'RFeyeNNNNNN' de 'RFeye002093 - ANATEL'."""
+    if not estacao_str:
+        return ""
+    m = re.search(r"(RFeye\\d{6})", estacao_str, flags=re.IGNORECASE)
+    return m.group(1) if m else ""
+
+def _map_local_by_estacao(estacao_str: str) -> str:
+    code = _extract_rfeye_code(estacao_str)
+    if code:
+        return MAPEAMENTO_CODIGO.get(code, estacao_str)
+    return estacao_str
+
 @st.cache_data(ttl=60)
 def carregar_pendencias_painel_mapeadas(_client):
     """
-    Lê a aba 'PAINEL', filtra Situação == 'Pendente' e retorna DF:
-    Local(de/para), Data, Frequência (MHz), Largura (kHz), Observações, ID, Estação(original).
-    Ordenado por Local.
+    Lê 'PAINEL', filtra Situação == 'Pendente' e retorna DF:
+    Local(mapeado por código RFeye em Estação), Data, Frequência (MHz),
+    Largura (kHz), Ocorrências (observações), ID, EstacaoRaw, Identificação.
     """
     try:
         planilha = _client.open_by_url(URL_PLANILHA)
@@ -156,47 +218,33 @@ def carregar_pendencias_painel_mapeadas(_client):
         rows = valores[1:]
         df = pd.DataFrame(rows, columns=header)
 
-        col_situacao = _first_col_match(
-            df.columns,
-            lambda s: s == "situação",
-            lambda s: s == "situacao"
-        )
-        col_estacao = _first_col_match(
-            df.columns,
-            lambda s: "estação" in s,
-            lambda s: "estacao" in s
-        )
-        col_data = _first_col_match(
-            df.columns, lambda s: s == "data", lambda s: s == "dia"
-        )
-        col_freq = _first_col_match(
-            df.columns, lambda s: "frequência" in s, lambda s: "frequencia" in s
-        )
-        col_larg = _first_col_match(df.columns, lambda s: "largura" in s)
-        col_obs = _first_col_match(df.columns, lambda s: "observa" in s)
-        col_id  = _first_col_match(df.columns, lambda s: s == "id")
+        col_situacao = _first_col_match(df.columns, lambda s: s == "situação", lambda s: s == "situacao")
+        col_estacao  = _first_col_match(df.columns, lambda s: "estação" in s, lambda s: "estacao" in s)
+        col_data     = _first_col_match(df.columns, lambda s: s == "data", lambda s: s == "dia")
+        col_freq     = _first_col_match(df.columns, lambda s: "frequência" in s, lambda s: "frequencia" in s)
+        col_larg     = _first_col_match(df.columns, lambda s: "largura" in s)
+        col_obs      = _first_col_match(df.columns, lambda s: "observa" in s)
+        col_id       = _first_col_match(df.columns, lambda s: s == "id")
+        col_ident    = _first_col_match(df.columns, lambda s: "identificação" in s, lambda s: "identificacao" in s)
 
         if not (col_situacao and col_estacao and col_id):
             return pd.DataFrame()
 
-        # Apenas pendentes
-        pend = df[df[col_situacao].astype(str).str.strip().str.lower() == "pendente"].copy()
+        situ = df[col_situacao].astype(str).str.strip().str.lower()
+        pend = df[situ.eq("pendente")].copy()
         if pend.empty:
             return pd.DataFrame()
 
-        # Mapear Local a partir de Estação
-        def map_local(est):
-            est = (est or "").strip()
-            return MAPEAMENTO_LOCAL.get(est, est)
-
         out = pd.DataFrame()
-        out["Local"] = pend[col_estacao].map(map_local)
+        out["Local"] = pend[col_estacao].map(_map_local_by_estacao)
         out["EstacaoRaw"] = pend[col_estacao]
         out["Data"] = pend[col_data] if col_data else ""
         out["Frequência (MHz)"] = pend[col_freq] if col_freq else ""
         out["Largura (kHz)"] = pend[col_larg] if col_larg else ""
         out["Ocorrências (observações)"] = pend[col_obs] if col_obs else ""
         out["ID"] = pend[col_id]
+        out["Identificação"] = pend[col_ident] if col_ident else ""
+
         out = out.sort_values(by=["Local", "Data"], kind="stable", na_position="last").reset_index(drop=True)
         return out
 
@@ -215,9 +263,6 @@ def _parse_data_ddmmyyyy(s):
     return date.today()
 
 def _find_header_col_index(header_list, *preds):
-    """
-    Retorna índice (1-based) da coluna cujo cabeçalho combine com um dos predicados.
-    """
     for idx, name in enumerate(header_list, start=1):
         s = (name or "").strip().lower()
         for p in preds:
@@ -228,9 +273,8 @@ def _find_header_col_index(header_list, *preds):
 def atualizar_campos_na_aba_mae(_client, estacao_raw, id_ocorrencia, novos_valores):
     """
     Atualiza, na aba RFeyeXXXXX indicada por 'estacao_raw', a linha cujo ID (col A) == id_ocorrencia.
-    'novos_valores' é um dict possivelmente contendo:
-      'Situação', 'Data', 'Frequência (MHz)', 'Largura (kHz)', 'Ocorrências (observações)'
-    Busca colunas por cabeçalho (robusto a variações).
+    novos_valores pode conter: 'Situação', 'Data', 'Ocorrências (observações)', 'Identificação'.
+    (Frequência/Largura estão bloqueadas na edição e não são atualizadas aqui.)
     """
     try:
         planilha = _client.open_by_url(URL_PLANILHA)
@@ -242,37 +286,30 @@ def atualizar_campos_na_aba_mae(_client, estacao_raw, id_ocorrencia, novos_valor
 
     try:
         header = aba.row_values(1)
-        # localizar linha pelo ID na coluna 1
-        cell = aba.find(str(id_ocorrencia), in_column=1)
+        cell = aba.find(str(id_ocorrencia), in_column=1)  # ID na coluna A
         if not cell:
             return f"ERRO: ID {id_ocorrencia} não encontrado na aba '{estacao_raw}'."
 
         row_idx = cell.row
 
-        # Índices por nome (robusto)
         col_situ = _find_header_col_index(header, lambda s: s == "situação", lambda s: s == "situacao")
         col_data = _find_header_col_index(header, lambda s: s == "data", lambda s: s == "dia")
-        col_freq = _find_header_col_index(header, lambda s: "frequência" in s, lambda s: "frequencia" in s)
-        col_larg = _find_header_col_index(header, lambda s: "largura" in s)
         col_obs  = _find_header_col_index(header, lambda s: "observa" in s)
+        col_ident= _find_header_col_index(header, lambda s: "identificação" in s, lambda s: "identificacao" in s)
 
-        # Fallback: se Situação não for achada por nome, usar coluna 16 (P) como nos seus códigos anteriores
         if col_situ is None:
-            col_situ = 16
+            col_situ = 16  # fallback: coluna P
 
         updates = []
         if "Situação" in novos_valores and col_situ:
             updates.append((row_idx, col_situ, novos_valores["Situação"]))
         if "Data" in novos_valores and col_data:
             updates.append((row_idx, col_data, novos_valores["Data"]))
-        if "Frequência (MHz)" in novos_valores and col_freq:
-            updates.append((row_idx, col_freq, novos_valores["Frequência (MHz)"]))
-        if "Largura (kHz)" in novos_valores and col_larg:
-            updates.append((row_idx, col_larg, novos_valores["Largura (kHz)"]))
         if "Ocorrências (observações)" in novos_valores and col_obs:
             updates.append((row_idx, col_obs, novos_valores["Ocorrências (observações)"]))
+        if "Identificação" in novos_valores and col_ident:
+            updates.append((row_idx, col_ident, novos_valores["Identificação"]))
 
-        # Aplicar updates (simples e claro)
         for r, c, v in updates:
             aba.update_cell(r, c, v)
 
@@ -281,8 +318,7 @@ def atualizar_campos_na_aba_mae(_client, estacao_raw, id_ocorrencia, novos_valor
     except Exception as e:
         return f"ERRO ao atualizar a aba '{estacao_raw}': {e}"
 
-# --- OUTRAS ROTINAS EXISTENTES ---
-
+# --- OUTRAS ROTINAS (inserção / BSR-ERB) ---
 def inserir_nova_abordagem(_client, dados_formulario):
     try:
         planilha = _client.open_by_url(URL_PLANILHA)
@@ -326,10 +362,10 @@ def carregar_opcoes_identificacao(_client):
         opcoes = [item[0] for item in lista_de_listas if item]
         return opcoes
     except Exception as e:
-        st.warning(f"Não foi possível carregar as opções de 'Identificação': {e}")
+        st.warning(f"Não é possível carregar 'Identificação da Emissão' (RFeye002093 - ANATEL): {e}")
         return ["Opção não carregada"]
 
-# --- Helper: botão "Voltar ao Menu" (proporção [2,2,2] = 1/3) ---
+# --- Helper: botão "Voltar ao Menu" (proporção [2,2,2]) ---
 def botao_voltar(label="⬅️ Voltar ao Menu", key=None):
     left, center, right = st.columns([2, 2, 2])
     with center:
@@ -337,6 +373,9 @@ def botao_voltar(label="⬅️ Voltar ao Menu", key=None):
 
 # --- TELAS ---
 def tela_menu_principal():
+    render_header("Abordagem - COP30")
+    st.divider()
+
     _, center_col, _ = st.columns([1, 2, 1])
     with center_col:
         _, button_col, _ = st.columns([0.5, 9, 0.5])
@@ -357,13 +396,13 @@ def tela_menu_principal():
             )
 
 def tela_consultar(client):
-    st.header("Consultar Pendências", divider=True)
-    st.info("Consulte as emissões pendentes de identificação (Sugestão: Verifique por região)")
+    render_header("Consultar Pendências")
+    st.divider()
 
+    st.info("Consulte as emissões pendentes de identificação (Sugestão: Verifique por região)")
     df_pend = carregar_pendencias_painel_mapeadas(client)
 
     if not df_pend.empty:
-        # Opções do dropdown (ordem específica) + guardamos também um índice pra recuperar o registro
         opcoes = [
             f"{row['Local']} | {row['Data']} | {row['Frequência (MHz)']} MHz | "
             f"{row['Largura (kHz)']} kHz | {row['Ocorrências (observações)']} | {row['ID']}"
@@ -379,34 +418,42 @@ def tela_consultar(client):
         if selecionado:
             idx = opcoes.index(selecionado)
             registro = df_pend.iloc[idx]
-            local = registro["Local"]
+            local       = registro["Local"]
             estacao_raw = registro["EstacaoRaw"]
-            id_sel = str(registro["ID"])
-            data_atual = _parse_data_ddmmyyyy(registro["Data"])
-            freq_atual = float(str(registro["Frequência (MHz)"]).replace(",", ".") or 0) if str(registro["Frequência (MHz)"]).strip() else 0.0
-            larg_atual = float(str(registro["Largura (kHz)"]).replace(",", ".") or 0) if str(registro["Largura (kHz)"]).strip() else 0.0
-            obs_atual  = str(registro["Ocorrências (observações)"]) if pd.notna(registro["Ocorrências (observações)"]) else ""
+            id_sel      = str(registro["ID"])
+            data_atual  = _parse_data_ddmmyyyy(registro["Data"])
+            freq_str    = str(registro["Frequência (MHz)"]) if pd.notna(registro["Frequência (MHz)"]) else ""
+            larg_str    = str(registro["Largura (kHz)"]) if pd.notna(registro["Largura (kHz)"]) else ""
+            obs_atual   = str(registro["Ocorrências (observações)"]) if pd.notna(registro["Ocorrências (observações)"]) else ""
+            ident_atual = str(registro["Identificação"]) if "Identificação" in registro and pd.notna(registro["Identificação"]) else ""
+            ident_idx   = IDENT_OPCOES.index(ident_atual) if ident_atual in IDENT_OPCOES else IDENT_OPCOES.index("Não identificado")
 
             st.markdown("#### Editar ocorrência selecionada")
             with st.form("form_editar_pendente", clear_on_submit=False):
                 colA, colB = st.columns(2)
                 with colA:
                     st.text_input("Local", value=local, disabled=True)
-                    novo_freq = st.number_input("Frequência (MHz)", value=freq_atual, step=0.001, format="%.3f")
+                    st.text_input("Frequência (MHz)", value=freq_str, disabled=True)
                     novo_obs  = st.text_area("Observações (detalhes)", value=obs_atual)
                 with colB:
                     nova_data = st.date_input("Data (DD/MM/AAAA)", value=data_atual)
-                    nova_larg = st.number_input("Largura (kHz)", value=larg_atual, step=0.1, format="%.1f")
+                    st.text_input("Largura (kHz)", value=larg_str, disabled=True)
                     nova_situ = st.selectbox("Situação", ["Pendente", "Concluído"], index=0)
+
+                nova_ident = st.selectbox(
+                    "Identificação da emissão",
+                    IDENT_OPCOES,
+                    index=ident_idx,
+                    help="Classificação da emissão conforme enquadramento técnico"
+                )
 
                 submitted = st.form_submit_button("Salvar alterações na aba-mãe (RFeye)")
                 if submitted:
                     novos = {
                         "Data": nova_data.strftime("%d/%m/%Y"),
-                        "Frequência (MHz)": f"{novo_freq:.3f}",
-                        "Largura (kHz)": f"{nova_larg:.1f}",
                         "Ocorrências (observações)": novo_obs,
-                        "Situação": nova_situ
+                        "Situação": nova_situ,
+                        "Identificação": nova_ident,
                     }
                     with st.spinner("Atualizando aba de origem..."):
                         resultado = atualizar_campos_na_aba_mae(client, estacao_raw, id_sel, novos)
@@ -414,7 +461,6 @@ def tela_consultar(client):
                         st.error(resultado)
                     else:
                         st.success(resultado)
-                        # Se marcou como concluído, já sugiro voltar
                         if nova_situ.lower() == "concluído":
                             if st.button("OK"):
                                 st.cache_data.clear()
@@ -427,7 +473,8 @@ def tela_consultar(client):
         st.rerun()
 
 def tela_inserir(client):
-    st.header("Inserir Nova Emissão", divider=True)
+    render_header("Inserir Nova Emissão")
+    st.divider()
 
     if st.session_state.get("show_success_emissao"):
         st.success("Nova emissão registrada com sucesso")
@@ -488,8 +535,9 @@ def tela_inserir(client):
         st.rerun()
 
 def tela_bsr_erb(client):
-    st.header("Inserir BSR / ERB Fake", divider=True)
-    
+    render_header("Inserir BSR / ERB Fake")
+    st.divider()
+
     if 'show_success_popup' in st.session_state:
         st.success(st.session_state.show_success_popup)
         if st.button("OK", use_container_width=True):
@@ -570,13 +618,10 @@ def tela_bsr_erb(client):
 # --- LÓGICA PRINCIPAL ---
 try:
     client = get_gspread_client()
-    header_cols = st.columns([1, 3, 1])
-    with header_cols[0]: st.image("logo.png", width=80)
-    with header_cols[1]: st.markdown('<div class="title-container"><h2>Abordagem - COP30</h2></div>', unsafe_allow_html=True)
-    with header_cols[2]: st.image("anatel.png", width=80)
-    st.divider()
 
-    if 'view' not in st.session_state: st.session_state.view = 'main_menu'
+    if 'view' not in st.session_state:
+        st.session_state.view = 'main_menu'
+
     if st.session_state.view == 'main_menu':
         tela_menu_principal()
     elif st.session_state.view == 'consultar':
