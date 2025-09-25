@@ -26,8 +26,6 @@ OBRIG = ":red[**\\***]"  # asterisco obrigatório
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1b2GOAOIN6mvgLH1rpvRD1vF4Ro9VOqylKkXaUTAq0Ro/edit"
 
 # Link do botão "Mapa das Estações"
-# Dica: para usar uma cidade fixa, substitua por algo como:
-# MAPS_URL = "https://www.google.com/maps/search/?api=1&query=Vit%C3%B3ria%2C%20Esp%C3%ADrito%20Santo%2C%20Brazil&zoom=14"
 MAPS_URL = "https://www.google.com/maps/search/?api=1&query=Minha%20localiza%C3%A7%C3%A3o&zoom=14"
 
 # Mapeamento RFeye -> Região (para dropdown do 1º botão)
@@ -49,6 +47,7 @@ MAPEAMENTO_ABAS = {
     "RFeye002175": "RFeye002175 - ALDEIA",
     "RFeye002129": "RFeye002129 - MANGUEIRINHO",
 }
+TODAS_ABAS_RFEYE = list(MAPEAMENTO_ABAS.values())
 
 # Opções fixas de Identificação (edição do 1º botão)
 IDENT_OPCOES = [
@@ -63,15 +62,7 @@ IDENT_OPCOES = [
 
 # Opções Faixa de Frequência (OBRIGATÓRIA) – sem item vazio
 FAIXA_OPCOES = [
-    "FM",
-    "SMA",
-    "SMM",
-    "SLP",
-    "TV",
-    "SMP",
-    "GNSS",
-    "Satélite",
-    "Radiação Restrita",
+    "FM", "SMA", "SMM", "SLP", "TV", "SMP", "GNSS", "Satélite", "Radiação Restrita",
 ]
 
 # --- LOGOS (BASE64) ---
@@ -344,17 +335,16 @@ def _valid_neg_coord(value: str) -> bool:
         return True
     return re.match(r"^-\d+\.\d{6}$", v) is not None
 
-# ========== PENDÊNCIAS (PAINEL) — LEITURA ==========
+# ================== CARREGAMENTOS / PENDÊNCIAS ==================
 @st.cache_data(ttl=180)
 def carregar_pendencias_painel_mapeadas(_client):
+    """Pendências do PAINEL (Situação == Pendente)."""
     try:
         planilha = _client.open_by_url(URL_PLANILHA)
         aba = planilha.worksheet("PAINEL")
-
         matriz = aba.get("A1:AF")
         if not matriz or len(matriz) < 2:
             return pd.DataFrame()
-
         header, rows = matriz[0], matriz[1:]
         df = pd.DataFrame(rows, columns=header)
 
@@ -405,7 +395,6 @@ def carregar_pendencias_painel_mapeadas(_client):
         out["Alguém mais ciente?"]           = pend[col_ciente] if col_ciente else ""
         out["Interferente?"]                 = pend[col_interf] if col_interf else ""
         out["Situação"]                      = pend[col_situ]
-
         out = out.sort_values(by=["Local", "Data"], kind="stable", na_position="last").reset_index(drop=True)
         out["Fonte"] = "PAINEL"
         return out
@@ -415,9 +404,9 @@ def carregar_pendencias_painel_mapeadas(_client):
         st.exception(e)
         return pd.DataFrame()
 
-# ========== PENDÊNCIAS (ABORDAGEM W=PENDENTE) ==========
 @st.cache_data(ttl=180)
 def carregar_pendencias_abordagem_pendentes(_client):
+    """Pendências da Abordagem (W == Pendente)."""
     try:
         planilha = _client.open_by_url(URL_PLANILHA)
         aba = planilha.worksheet("Abordagem")
@@ -475,6 +464,51 @@ def carregar_pendencias_abordagem_pendentes(_client):
         st.error("Erro ao carregar pendências da aba 'Abordagem'.")
         st.exception(e)
         return pd.DataFrame()
+
+# ===================== BUSCA POR TEXTO (NOVO) =====================
+def _load_sheet_as_df(client, sheet_name: str) -> pd.DataFrame:
+    """Lê uma aba qualquer e retorna DataFrame completo com cabeçalho da linha 1."""
+    planilha = client.open_by_url(URL_PLANILHA)
+    aba = planilha.worksheet(sheet_name)
+    values = aba.get_all_values()
+    if not values or len(values) < 2:
+        return pd.DataFrame()
+    header, rows = values[0], values[1:]
+    df = pd.DataFrame(rows, columns=header)
+    return df
+
+def _find_obs_col(columns: List[str]) -> Optional[str]:
+    """Acha o nome da coluna 'Ocorrência (observações)' (variações) em uma aba qualquer."""
+    for c in columns:
+        s = (c or "").strip().lower()
+        if "observa" in s or "ocorrência" in s or "ocorrencia" in s:
+            return c
+    return None
+
+def _buscar_por_texto_livre(client, termos: str, abas: List[str]) -> pd.DataFrame:
+    """Busca case-insensitive por 'termos' na coluna de observações das abas escolhidas."""
+    resultados = []
+    for nome in abas:
+        try:
+            df = _load_sheet_as_df(client, nome)
+            if df.empty:
+                continue
+            col_obs = _find_obs_col(list(df.columns))
+            if not col_obs:
+                continue
+            mask = df[col_obs].astype(str).str.contains(termos, case=False, na=False)
+            achados = df[mask].copy()
+            if achados.empty:
+                continue
+            achados.insert(0, "Aba/Origem", nome)
+            resultados.append(achados)
+        except gspread.exceptions.WorksheetNotFound:
+            continue
+        except Exception:
+            continue
+    if not resultados:
+        return pd.DataFrame()
+    return pd.concat(resultados, ignore_index=True)
 
 # ============== ATUALIZAÇÃO NAS ABAS-MÃE ==============
 def _find_header_col_index(header_list: List[str], *preds) -> Optional[int]:
@@ -590,22 +624,17 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
         planilha = _client.open_by_url(URL_PLANILHA)
         aba = planilha.worksheet("Abordagem")
 
-        # 1) Achar a 1ª linha com COLUNA M vazia
         row = _first_row_where_col_empty(aba, "M", start_row=2)
-
-        # 2) Próximo sequencial na coluna H
         next_id = _next_sequential_id(aba, col_letter="H", start_row=2)
 
-        # 3) Preparar valores
         dia_val = dados_formulario.get("Dia", "")
         if hasattr(dia_val, "strftime"):
             dia_val = dia_val.strftime("%d/%m/%Y")
 
         hora_val = dados_formulario.get("Hora", "")
-        if hasattr(hora_val, "strftime"):  # time
+        if hasattr(hora_val, "strftime"):
             hora_val = hora_val.strftime("%H:%M")
 
-        # NÚMEROS em M e N (float) para garantir formato numérico (RAW)
         freq_val = float(dados_formulario.get("Frequência em MHz", 0.0) or 0.0)
         larg_val = float(dados_formulario.get("Largura em kHz", 0.0) or 0.0)
 
@@ -617,13 +646,11 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
         autoriz  = (dados_formulario.get("Autorizado? (Q)", "") or "").strip()
         situ_val = (dados_formulario.get("Situação", "Pendente") or "Pendente").strip()
 
-        # T = Observações (+ " - " + Responsável se tiver)
         if obs_val and resp_val:
             t_concat = f"{obs_val} - {resp_val}"
         else:
             t_concat = obs_val or resp_val
 
-        # Garantia: Faixa de Frequência obrigatória
         if faixa_val == "":
             return False
 
@@ -645,7 +672,6 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
             situ_val,                               # W
         ]
 
-        # 4) Escrever H (texto) e I:W (RAW = garante números em M/N)
         aba.update(f"H{row}", [[str(next_id)]], value_input_option="RAW")
         aba.update(f"I{row}:W{row}", [vals_I_to_W], value_input_option="RAW")
         return True
@@ -656,10 +682,7 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
         return False
 
 def inserir_bsr_erb(_client, tipo_ocorrencia: str, regiao: str, lat: str, lon: str) -> str:
-    """
-    Registra BSR ou ERB Fake na 1ª linha vazia do bloco X:AC:
-      BSR: X=1, Y=região; ERB: Z=1, AA=região; AB=lat, AC=lon (para ambos).
-    """
+    """Registra BSR ou ERB Fake na 1ª linha vazia do bloco X:AC."""
     try:
         planilha = _client.open_by_url(URL_PLANILHA)
         aba = planilha.worksheet("Abordagem")
@@ -716,13 +739,17 @@ def tela_menu_principal():
             if st.button("REGISTRAR ocorrência de\nBSR/Jammer ou ERB Fake", use_container_width=True):
                 st.session_state.view = 'bsr_erb'; st.rerun()
 
-            # Consulta UTE (link com layout igual)
+            # NOVO: Busca por emissão específica
+            if st.button("Busca por\nemissão específica", use_container_width=True):
+                st.session_state.view = 'busca'; st.rerun()
+
+            # Consulta UTE
             st.markdown(
                 '<a class="app-btn" href="https://anatel365-my.sharepoint.com/:x:/r/personal/tiberio_anatel_gov_br/_layouts/15/Doc.aspx?sourcedoc=%7B528F51A7-93B8-474F-85FF-D5307E1A801A%7D&file=UTE%20delega%25u00e7%25u00f5es%20COP30.xlsx&wdLOR=c31770DF3-2771-433A-A9DD-783B0D107FE2&fromShare=true&action=default&mobileredirect=true" target="_blank" rel="noopener noreferrer">CONSULTAR<br>Atos UTE</a>',
                 unsafe_allow_html=True
             )
 
-            # Mapa das Estações (link para Maps com "Minha localização")
+            # Mapa das Estações
             st.markdown(
                 f'<a class="app-btn" href="{MAPS_URL}" target="_blank" rel="noopener noreferrer">Mapa das Estações</a>',
                 unsafe_allow_html=True
@@ -841,7 +868,7 @@ def tela_consultar(client):
                     autz_edit  = st.selectbox(f"Autorizado? {OBRIG}",
                                               options=["Sim", "Não", "Indefinido"],
                                               index=["Sim","Não","Indefinido"].index(autz_atual) if autz_atual in ["Sim","Não","Indefinido"] else 2)
-                    ute_check  = st.checkbox("UTE?")
+                    ute_check  = st.checkbox("UTE?", value=ute_default)
                     proc_edit  = st.text_input("Processo SEI UTE (ou Ato UTE)", value=proc_sei)
                     obs_edit   = st.text_area("Ocorrência (obsevações)", value=obs_txt)
                     ciente_edit= st.text_input("Alguém mais ciente?", value=ciente_txt)
@@ -903,7 +930,6 @@ def tela_inserir(client):
 
     opcoes_identificacao = carregar_opcoes_identificacao(client)
     with st.form("form_nova_emissao", clear_on_submit=False):
-        # Hora atual padrão
         hora_padrao = datetime.now().time().replace(second=0, microsecond=0)
 
         dados = {
@@ -1011,9 +1037,9 @@ def tela_bsr_erb(client):
 
                 coord_erros = []
                 if not _valid_neg_coord(lat):
-                    coord_erros.append("Latitude (use o padrão -N.NNNNNN, ex.: -1.234567)")
+                    coord_erros.append("Latitude (use o padrão -1.234567)")
                 if not _valid_neg_coord(lon):
-                    coord_erros.append("Longitude (use o padrão -N.NNNNNN, ex.: -48.123456)")
+                    coord_erros.append("Longitude (use o padrão -48.123456)")
                 if coord_erros:
                     st.error("Erro nas coordenadas: " + " | ".join(coord_erros))
 
@@ -1033,6 +1059,42 @@ def tela_bsr_erb(client):
             if k in st.session_state: del st.session_state[k]
         st.session_state.view = 'main_menu'; st.rerun()
 
+# ======================= NOVA TELA: BUSCA =========================
+def tela_busca(client):
+    render_header()
+    st.divider()
+
+    st.markdown(
+        '<div class="info-green">Busca por emissão específica no campo "Ocorrência (observações)"</div>',
+        unsafe_allow_html=True
+    )
+
+    termo = st.text_input("Digite o texto para buscar (mín. 3 caracteres):", value="")
+    # Seleção das abas
+    opcoes_abas = ["PAINEL", "Abordagem"] + TODAS_ABAS_RFEYE
+    sel_abas = st.multiselect("Escolha as abas onde buscar (padrão: todas):", options=opcoes_abas, default=opcoes_abas)
+
+    colL, colC, colR = st.columns([3,4,3])
+    with colC:
+        acionar = st.button("Buscar", use_container_width=True)
+
+    if acionar:
+        if len(termo.strip()) < 3:
+            st.warning("Digite pelo menos 3 caracteres para buscar.")
+        else:
+            # Executa a busca
+            with st.spinner("Procurando..."):
+                df_res = _buscar_por_texto_livre(client, termo.strip(), sel_abas)
+            if df_res.empty:
+                st.info("Nenhum resultado encontrado para sua busca.")
+            else:
+                st.success(f"Resultados encontrados: {len(df_res)}")
+                st.dataframe(df_res, use_container_width=True, hide_index=True)
+
+    if botao_voltar(key="voltar_busca"):
+        st.session_state.view = 'main_menu'
+        st.rerun()
+
 # =========================== MAIN ===========================
 try:
     client = get_gspread_client()
@@ -1042,10 +1104,11 @@ try:
     elif st.session_state.view == 'consultar':
         tela_consultar(client)
     elif st.session_state.view == 'inserir':
-        # Tela de inserção foi integrada dentro das definições acima
         tela_inserir(client)
     elif st.session_state.view == 'bsr_erb':
         tela_bsr_erb(client)
+    elif st.session_state.view == 'busca':
+        tela_busca(client)
 except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
     st.exception(e)
