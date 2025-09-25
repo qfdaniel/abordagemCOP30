@@ -5,6 +5,7 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime, date
 import re
 import base64
+import unicodedata
 from pathlib import Path
 from typing import Optional, Dict, List
 
@@ -60,9 +61,17 @@ IDENT_OPCOES = [
     "Não identificado",
 ]
 
-# Opções Faixa de Frequência (OBRIGATÓRIA) – sem item vazio
+# Opções Faixa de Frequência (OBRIGATÓRIA)
 FAIXA_OPCOES = [
-    "FM", "SMA", "SMM", "SLP", "TV", "SMP", "GNSS", "Satélite", "Radiação Restrita",
+    "FM",
+    "SMA",
+    "SMM",
+    "SLP",
+    "TV",
+    "SMP",
+    "GNSS",
+    "Satélite",
+    "Radiação Restrita",
 ]
 
 # --- LOGOS (BASE64) ---
@@ -73,7 +82,7 @@ def _img_b64(path: str) -> Optional[str]:
     return base64.b64encode(p.read_bytes()).decode("utf-8")
 
 def render_header(esquerda: str = "logo.png", direita: str = "anatel.png"):
-    """Renderiza o título fixo + logos (sem wrappers extras)."""
+    """Renderiza o título fixo + logos."""
     left_b64  = _img_b64(esquerda)
     right_b64 = _img_b64(direita)
     left_tag  = f'<img class="hdr-img hdr-left" src="data:image/png;base64,{left_b64}" alt="Logo esquerda">' if left_b64 else ""
@@ -95,7 +104,17 @@ st.markdown(f"""
   .block-container {{ max-width: 760px; padding-top: .75rem; padding-bottom: .75rem; margin: 0 auto; }}
   .stApp {{ background-color: #D7D6D4; }}
   #MainMenu, footer, header {{ visibility: hidden; }}
-  div[data-testid="stDivider"]{{ margin-top: -1.2rem !important; }}
+
+  /* Remove o span com ícone/link no header do Streamlit */
+  span[data-testid="stHeaderActionElements"] {{
+      display: none !important;
+  }}
+
+  /* Ajusta espaçamento da divisória (acima/abaixo) */
+  div[data-testid="stDivider"] {{
+      margin-top: -0.6rem !important;
+      margin-bottom: -0.6rem !important;
+  }}
 
   /* Header: grid simples 3 colunas (logo, título, logo) */
   .header-logos {{
@@ -111,7 +130,7 @@ st.markdown(f"""
   .hdr-right {{ justify-self: start; }}
   .header-logos h2{{ margin:0; color:#1A311F; font-weight:800; text-shadow:2px 2px 4px rgba(0,0,0,.2); font-size:2rem; line-height:1.1; grid-column:2; }}
 
-  /* ===== PADRÃO para TODOS os st.button (fora do menu e no menu) ===== */
+  /* ===== PADRÃO para TODOS os st.button ===== */
   .stButton>button {{
     width:100%;
     min-height:{BTN_HEIGHT};
@@ -158,7 +177,7 @@ st.markdown(f"""
     box-shadow:4px 4px 8px rgba(0,0,0,.4); transform:translateY(-2px);
   }}
 
-  /* Tradutor de Voz (verde) — fonte 1.1em e negrito para igualar aos demais */
+  /* Tradutor de Voz (verde) */
   div[data-testid="stLinkButton"] a,
   a[data-testid="stLinkButton"],
   div[data-testid="stLinkButtonContainer"] a {{
@@ -179,28 +198,7 @@ st.markdown(f"""
   }}
 
   .confirm-warning{{ background:linear-gradient(to bottom, #d9534f, #c9302c); color:white; font-weight:800; text-align:center; padding:1rem; border-radius:8px; margin-bottom:1rem; }}
-
-  /* Banner verde de instrução */
-  .info-green {{
-    background: linear-gradient(to bottom, #1b5e20, #2e7d32);
-    color: #fff;
-    font-weight: 700;
-    text-align: center;
-    padding: .8rem 1rem;
-    border-radius: 8px;
-    margin: .25rem 0 1rem;
-  }}
-
-  /* Botão SALVAR (edição do 1º botão) com mais contraste */
-  form[aria-label="form_editar_pendente"] .stButton > button {{
-    background: linear-gradient(to bottom, #0d1f47, #5b80c9) !important;
-    border-color: #ffffff !important;
-    color: #ffffff !important;
-  }}
-  form[aria-label="form_editar_pendente"] .stButton > button:hover {{
-    background: linear-gradient(to bottom, #0b1a3c, #6d90d4) !important;
-    border-color: #ffffff !important;
-  }}
+  .info-green {{ background: linear-gradient(to bottom, #1b5e20, #2e7d32); color: #fff; font-weight: 700; text-align: center; padding: .8rem 1rem; border-radius: 8px; margin: .25rem 0 1rem; }}
 
   @media (max-width:640px){{
     .block-container{{ max_width:100%; padding:.5rem .75rem; }}
@@ -335,16 +333,36 @@ def _valid_neg_coord(value: str) -> bool:
         return True
     return re.match(r"^-\d+\.\d{6}$", v) is not None
 
-# ================== CARREGAMENTOS / PENDÊNCIAS ==================
+# ---------- Normalização para busca ----------
+def _normalize_text(s: str) -> str:
+    """lower + remove acentos + strip; lida com None."""
+    if s is None:
+        return ""
+    s = str(s)
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+    return s.strip().lower()
+
+def _contains_norm(series: pd.Series, termo: str) -> pd.Series:
+    """Busca substring com normalização (casefold+sem acento) e NA seguro."""
+    termo_norm = _normalize_text(termo)
+    return series.fillna("").astype(str).apply(lambda x: termo_norm in _normalize_text(x))
+
+def _as_bool_sim(valor: str) -> bool:
+    s = (str(valor or "")).strip().lower()
+    return s in ("sim", "true", "1", "x", "ok")
+
+# ========== PENDÊNCIAS (PAINEL) — LEITURA ==========
 @st.cache_data(ttl=180)
 def carregar_pendencias_painel_mapeadas(_client):
-    """Pendências do PAINEL (Situação == Pendente)."""
     try:
         planilha = _client.open_by_url(URL_PLANILHA)
         aba = planilha.worksheet("PAINEL")
+
         matriz = aba.get("A1:AF")
         if not matriz or len(matriz) < 2:
             return pd.DataFrame()
+
         header, rows = matriz[0], matriz[1:]
         df = pd.DataFrame(rows, columns=header)
 
@@ -395,6 +413,7 @@ def carregar_pendencias_painel_mapeadas(_client):
         out["Alguém mais ciente?"]           = pend[col_ciente] if col_ciente else ""
         out["Interferente?"]                 = pend[col_interf] if col_interf else ""
         out["Situação"]                      = pend[col_situ]
+
         out = out.sort_values(by=["Local", "Data"], kind="stable", na_position="last").reset_index(drop=True)
         out["Fonte"] = "PAINEL"
         return out
@@ -404,9 +423,9 @@ def carregar_pendencias_painel_mapeadas(_client):
         st.exception(e)
         return pd.DataFrame()
 
+# ========== PENDÊNCIAS (ABORDAGEM W=PENDENTE) ==========
 @st.cache_data(ttl=180)
 def carregar_pendencias_abordagem_pendentes(_client):
-    """Pendências da Abordagem (W == Pendente)."""
     try:
         planilha = _client.open_by_url(URL_PLANILHA)
         aba = planilha.worksheet("Abordagem")
@@ -464,51 +483,6 @@ def carregar_pendencias_abordagem_pendentes(_client):
         st.error("Erro ao carregar pendências da aba 'Abordagem'.")
         st.exception(e)
         return pd.DataFrame()
-
-# ===================== BUSCA POR TEXTO (NOVO) =====================
-def _load_sheet_as_df(client, sheet_name: str) -> pd.DataFrame:
-    """Lê uma aba qualquer e retorna DataFrame completo com cabeçalho da linha 1."""
-    planilha = client.open_by_url(URL_PLANILHA)
-    aba = planilha.worksheet(sheet_name)
-    values = aba.get_all_values()
-    if not values or len(values) < 2:
-        return pd.DataFrame()
-    header, rows = values[0], values[1:]
-    df = pd.DataFrame(rows, columns=header)
-    return df
-
-def _find_obs_col(columns: List[str]) -> Optional[str]:
-    """Acha o nome da coluna 'Ocorrência (observações)' (variações) em uma aba qualquer."""
-    for c in columns:
-        s = (c or "").strip().lower()
-        if "observa" in s or "ocorrência" in s or "ocorrencia" in s:
-            return c
-    return None
-
-def _buscar_por_texto_livre(client, termos: str, abas: List[str]) -> pd.DataFrame:
-    """Busca case-insensitive por 'termos' na coluna de observações das abas escolhidas."""
-    resultados = []
-    for nome in abas:
-        try:
-            df = _load_sheet_as_df(client, nome)
-            if df.empty:
-                continue
-            col_obs = _find_obs_col(list(df.columns))
-            if not col_obs:
-                continue
-            mask = df[col_obs].astype(str).str.contains(termos, case=False, na=False)
-            achados = df[mask].copy()
-            if achados.empty:
-                continue
-            achados.insert(0, "Aba/Origem", nome)
-            resultados.append(achados)
-        except gspread.exceptions.WorksheetNotFound:
-            continue
-        except Exception:
-            continue
-    if not resultados:
-        return pd.DataFrame()
-    return pd.concat(resultados, ignore_index=True)
 
 # ============== ATUALIZAÇÃO NAS ABAS-MÃE ==============
 def _find_header_col_index(header_list: List[str], *preds) -> Optional[int]:
@@ -598,7 +572,7 @@ def atualizar_campos_abordagem_por_id(_client, id_h: str, novos_valores: Dict[st
     except Exception as e:
         return f"Erro ao atualizar 'Abordagem' (ID={id_h}): {e}"
 
-# ============== INSERÇÕES ==============
+# =================== INSERÇÕES ===================
 def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
     """
     Grava na 1ª linha onde a COLUNA M estiver vazia, na aba 'Abordagem',
@@ -624,9 +598,13 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
         planilha = _client.open_by_url(URL_PLANILHA)
         aba = planilha.worksheet("Abordagem")
 
+        # 1) Achar a 1ª linha com COLUNA M vazia
         row = _first_row_where_col_empty(aba, "M", start_row=2)
+
+        # 2) Próximo sequencial na coluna H
         next_id = _next_sequential_id(aba, col_letter="H", start_row=2)
 
+        # 3) Preparar valores
         dia_val = dados_formulario.get("Dia", "")
         if hasattr(dia_val, "strftime"):
             dia_val = dia_val.strftime("%d/%m/%Y")
@@ -635,6 +613,7 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
         if hasattr(hora_val, "strftime"):
             hora_val = hora_val.strftime("%H:%M")
 
+        # NÚMEROS em M e N (float) para garantir formato numérico (RAW)
         freq_val = float(dados_formulario.get("Frequência em MHz", 0.0) or 0.0)
         larg_val = float(dados_formulario.get("Largura em kHz", 0.0) or 0.0)
 
@@ -646,11 +625,13 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
         autoriz  = (dados_formulario.get("Autorizado? (Q)", "") or "").strip()
         situ_val = (dados_formulario.get("Situação", "Pendente") or "Pendente").strip()
 
+        # T = Observações (+ " - " + Responsável se tiver)
         if obs_val and resp_val:
             t_concat = f"{obs_val} - {resp_val}"
         else:
             t_concat = obs_val or resp_val
 
+        # Garantia: Faixa de Frequência obrigatória
         if faixa_val == "":
             return False
 
@@ -672,6 +653,7 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
             situ_val,                               # W
         ]
 
+        # 4) Escrever H (texto) e I:W (RAW = garante números em M/N)
         aba.update(f"H{row}", [[str(next_id)]], value_input_option="RAW")
         aba.update(f"I{row}:W{row}", [vals_I_to_W], value_input_option="RAW")
         return True
@@ -682,7 +664,10 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
         return False
 
 def inserir_bsr_erb(_client, tipo_ocorrencia: str, regiao: str, lat: str, lon: str) -> str:
-    """Registra BSR ou ERB Fake na 1ª linha vazia do bloco X:AC."""
+    """
+    Registra BSR ou ERB Fake na 1ª linha vazia do bloco X:AC:
+      BSR: X=1, Y=região; ERB: Z=1, AA=região; AB=lat, AC=lon (para ambos).
+    """
     try:
         planilha = _client.open_by_url(URL_PLANILHA)
         aba = planilha.worksheet("Abordagem")
@@ -717,11 +702,123 @@ def carregar_opcoes_identificacao(_client):
         st.warning(f"Não é possível carregar 'Identificação da Emissão' (RFeye002093 - ANATEL): {e}")
         return ["Opção não carregada"]
 
+# --- util: carregar qualquer aba como DataFrame ---
+def _load_sheet_as_df(client, nome_aba: str) -> pd.DataFrame:
+    planilha = client.open_by_url(URL_PLANILHA)
+    aba = planilha.worksheet(nome_aba)
+    values = aba.get_all_values()
+    if not values:
+        return pd.DataFrame()
+    header, rows = values[0], values[1:]
+    return pd.DataFrame(rows, columns=header)
+
+# --- Busca por texto livre (com fallback para todas colunas) ---
+def _find_obs_col(columns: List[str]) -> Optional[str]:
+    for c in columns:
+        s = (c or "").strip().lower()
+        if "observa" in s or "ocorrência" in s or "ocorrencia" in s:
+            return c
+    return None
+
+def _buscar_por_texto_livre(client, termos: str, abas: List[str]) -> pd.DataFrame:
+    """
+    Busca normalizada (sem acento, case-insensitive, substring) nas abas selecionadas.
+    1) Tenta na coluna de Observações/Ocorrência (se existir).
+    2) Se a aba não tiver coluna de observações, faz fallback: concatena todas as colunas de texto.
+    Retorna um DF com uma coluna 'Aba/Origem' antes dos dados originais.
+    """
+    resultados = []
+    for nome in abas:
+        try:
+            df = _load_sheet_as_df(client, nome)
+            if df.empty:
+                continue
+
+            col_obs = _find_obs_col(list(df.columns))
+            if col_obs:
+                mask = _contains_norm(df[col_obs].astype(str), termos)
+            else:
+                combinado = df.astype(str).agg(" | ".join, axis=1)
+                mask = _contains_norm(combinado, termos)
+
+            achados = df[mask].copy()
+            if achados.empty:
+                continue
+            achados.insert(0, "Aba/Origem", nome)
+            resultados.append(achados)
+        except gspread.exceptions.WorksheetNotFound:
+            continue
+        except Exception:
+            continue
+
+    if not resultados:
+        return pd.DataFrame()
+    return pd.concat(resultados, ignore_index=True)
+
 # --- Botão Voltar centralizado ([2,2,2]) ---
 def botao_voltar(label="⬅️ Voltar ao Menu", key=None):
     left, center, right = st.columns([2, 2, 2])
     with center:
         return st.button(label, use_container_width=True, key=key)
+
+# --- Renderização "somente leitura" com o MESMO layout da tela de tratar ---
+def render_ocorrencia_readonly(row: pd.Series, key_prefix: str):
+    """
+    Mostra os dados no mesmo layout visual da tela de 'Tratar emissões',
+    porém todos os campos bloqueados (somente consulta).
+    Cada widget recebe uma key única baseada em key_prefix.
+    """
+    id_sel      = str(row.get("ID", ""))
+    local_map   = str(row.get("Local", row.get("Local/Região", "")))
+    fiscal      = str(row.get("Fiscal", ""))
+    data_txt    = str(row.get("Data", ""))
+    hora_txt    = str(row.get("HH:mm", ""))
+    freq_txt    = str(row.get("Frequência (MHz)", ""))
+    bw_txt      = str(row.get("Largura (kHz)", ""))
+    faixa_env   = str(row.get("Faixa de Frequência Envolvida", ""))
+
+    ident_atual = str(row.get("Identificação", ""))
+    autz_atual  = str(row.get("Autorizado?", row.get("Autorizado? (Q)", "")))
+    ute_atual   = str(row.get("UTE?", ""))
+    proc_sei    = str(row.get("Processo SEI UTE", row.get("Processo SEI ou ATO UTE", "")))
+    obs_txt     = str(row.get("Ocorrência (observações)", row.get("Observações/Detalhes/Contatos", "")))
+    ciente_txt  = str(row.get("Alguém mais ciente?", ""))
+    interf_at   = str(row.get("Interferente?", ""))
+    situ_atual  = str(row.get("Situação", row.get("Situação ", "Pendente")))
+
+    colA, colB = st.columns(2)
+    with colA:
+        st.text_input("ID", value=id_sel, disabled=True, key=f"{key_prefix}_id")
+        st.text_input("Estação utilizada", value=local_map, disabled=True, key=f"{key_prefix}_estacao")
+        st.text_input("Fiscal", value=fiscal, disabled=True, key=f"{key_prefix}_fiscal")
+        st.text_input("Data da identificação", value=data_txt, disabled=True, key=f"{key_prefix}_data")
+        st.text_input("HH:mm", value=hora_txt, disabled=True, key=f"{key_prefix}_hora")
+        st.text_input("Frequência (MHz)", value=freq_txt, disabled=True, key=f"{key_prefix}_freq")
+        st.text_input("Largura (kHz)", value=bw_txt, disabled=True, key=f"{key_prefix}_largura")
+        st.text_input("Faixa de Frequência Envolvida", value=faixa_env, disabled=True, key=f"{key_prefix}_faixa")
+
+    with colB:
+        ident_idx = IDENT_OPCOES.index(ident_atual) if ident_atual in IDENT_OPCOES else 0
+        st.selectbox(f"Identificação {OBRIG}", options=IDENT_OPCOES, index=ident_idx, disabled=True, key=f"{key_prefix}_ident")
+
+        opts_autz = ["Sim", "Não", "Indefinido"]
+        idx_autz = opts_autz.index(autz_atual) if autz_atual in opts_autz else 2
+        st.selectbox(f"Autorizado? {OBRIG}", options=opts_autz, index=idx_autz, disabled=True, key=f"{key_prefix}_autz")
+
+        ute_val = (str(ute_atual).strip().lower() in ("sim","true","1","x","ok"))
+        st.checkbox("UTE?", value=ute_val, disabled=True, key=f"{key_prefix}_ute")
+
+        st.text_input("Processo SEI UTE (ou Ato UTE)", value=proc_sei, disabled=True, key=f"{key_prefix}_procsei")
+        st.text_area("Ocorrência (obsevações)", value=obs_txt, disabled=True, key=f"{key_prefix}_obs")
+
+        st.text_input("Alguém mais ciente?", value=ciente_txt, disabled=True, key=f"{key_prefix}_ciente")
+        opts_interf = ["Sim", "Não", "Indefinido"]
+        idx_interf = opts_interf.index(interf_at) if interf_at in opts_interf else 2
+        st.selectbox(f"Interferente? {OBRIG}", options=opts_interf, index=idx_interf, disabled=True, key=f"{key_prefix}_interf")
+
+        opts_situ = ["Pendente", "Concluído"]
+        idx_situ = opts_situ.index(situ_atual) if situ_atual in opts_situ else 0
+        st.selectbox(f"Situação {OBRIG}", options=opts_situ, index=idx_situ, disabled=True, key=f"{key_prefix}_situ")
 
 # ========================= TELAS =========================
 def tela_menu_principal():
@@ -738,24 +835,17 @@ def tela_menu_principal():
                 st.session_state.view = 'inserir'; st.rerun()
             if st.button("REGISTRAR ocorrência de\nBSR/Jammer ou ERB Fake", use_container_width=True):
                 st.session_state.view = 'bsr_erb'; st.rerun()
-
-            # NOVO: Busca por emissão específica
-            if st.button("Busca por\nemissão específica", use_container_width=True):
+            if st.button("BUSCAR emissão específica", use_container_width=True):
                 st.session_state.view = 'busca'; st.rerun()
 
-            # Consulta UTE
             st.markdown(
                 '<a class="app-btn" href="https://anatel365-my.sharepoint.com/:x:/r/personal/tiberio_anatel_gov_br/_layouts/15/Doc.aspx?sourcedoc=%7B528F51A7-93B8-474F-85FF-D5307E1A801A%7D&file=UTE%20delega%25u00e7%25u00f5es%20COP30.xlsx&wdLOR=c31770DF3-2771-433A-A9DD-783B0D107FE2&fromShare=true&action=default&mobileredirect=true" target="_blank" rel="noopener noreferrer">CONSULTAR<br>Atos UTE</a>',
                 unsafe_allow_html=True
             )
-
-            # Mapa das Estações
             st.markdown(
                 f'<a class="app-btn" href="{MAPS_URL}" target="_blank" rel="noopener noreferrer">Mapa das Estações</a>',
                 unsafe_allow_html=True
             )
-
-            # Tradutor de Voz (verde)
             st.link_button(
                 "Tradutor de Voz",
                 "https://translate.google.com/?sl=auto&tl=pt&op=translate",
@@ -766,9 +856,8 @@ def tela_consultar(client):
     render_header()
     st.divider()
 
-    # Banner verde
     st.markdown(
-        '<div class="info-green">Consulte as emissões pendentes de identificação (Sugestão: Verifique por região)</div>',
+        '<div class="info-green">Consulte as emissões pendentes de identificação\n(Sugestão: Verifique por região)</div>',
         unsafe_allow_html=True
     )
 
@@ -845,11 +934,6 @@ def tela_consultar(client):
             situ_atual  = str(registro.get("Situação", "Pendente"))
             fonte       = str(registro.get("Fonte", "PAINEL"))
 
-            ute_default = ute_atual.strip().lower() in ("sim", "true", "1", "x", "ok")
-            ident_idx = IDENT_OPCOES.index(ident_atual) if ident_atual in IDENT_OPCOES else (
-                IDENT_OPCOES.index("Não identificado") if "Não identificado" in IDENT_OPCOES else 0
-            )
-
             st.markdown("#### Editar ocorrência selecionada")
             with st.form("form_editar_pendente", clear_on_submit=False):
                 colA, colB = st.columns(2)
@@ -864,11 +948,10 @@ def tela_consultar(client):
                     st.text_input("Faixa de Frequência Envolvida", value=faixa_env, disabled=True)
 
                 with colB:
-                    ident_edit = st.selectbox(f"Identificação {OBRIG}", options=IDENT_OPCOES, index=ident_idx)
-                    autz_edit  = st.selectbox(f"Autorizado? {OBRIG}",
-                                              options=["Sim", "Não", "Indefinido"],
+                    ident_edit = st.selectbox(f"Identificação {OBRIG}", options=IDENT_OPCOES, index=IDENT_OPCOES.index(ident_atual) if ident_atual in IDENT_OPCOES else 0)
+                    autz_edit  = st.selectbox(f"Autorizado? {OBRIG}", options=["Sim", "Não", "Indefinido"],
                                               index=["Sim","Não","Indefinido"].index(autz_atual) if autz_atual in ["Sim","Não","Indefinido"] else 2)
-                    ute_check  = st.checkbox("UTE?", value=ute_default)
+                    ute_check  = st.checkbox("UTE? ", value=(ute_atual.strip().lower() in ("sim","true","1","x","ok")))
                     proc_edit  = st.text_input("Processo SEI UTE (ou Ato UTE)", value=proc_sei)
                     obs_edit   = st.text_area("Ocorrência (obsevações)", value=obs_txt)
                     ciente_edit= st.text_input("Alguém mais ciente?", value=ciente_txt)
@@ -930,6 +1013,7 @@ def tela_inserir(client):
 
     opcoes_identificacao = carregar_opcoes_identificacao(client)
     with st.form("form_nova_emissao", clear_on_submit=False):
+        # Hora atual padrão
         hora_padrao = datetime.now().time().replace(second=0, microsecond=0)
 
         dados = {
@@ -956,17 +1040,26 @@ def tela_inserir(client):
 
         if submitted:
             erros = []
-            if not dados['Fiscal'].strip(): erros.append("Fiscal Responsável")
-            if dados['Frequência em MHz'] is None or dados['Frequência em MHz'] <= 0: erros.append("Frequência (MHz) > 0")
-            if dados['Largura em kHz'] is None or dados['Largura em kHz'] <= 0: erros.append("Largura em kHz > 0")
-            if not dados['Faixa de Frequência']: erros.append("Faixa de Frequência")
-            if dados['Identificação'] is None: erros.append("Identificação da Emissão")
-            if dados['Autorizado? (Q)'] is None: erros.append("Autorizado?")
-            if dados['Interferente?'] is None: erros.append("Interferente?")
+            if not dados['Fiscal'].strip():
+                erros.append("Fiscal Responsável")
+            if (dados['Frequência em MHz'] is None) or (dados['Frequência em MHz'] <= 0):
+                erros.append("Frequência (MHz) > 0")
+            if (dados['Largura em kHz'] is None) or (dados['Largura em kHz'] <= 0):
+                erros.append("Largura em kHz > 0")
+            if not dados['Faixa de Frequência']:
+                erros.append("Faixa de Frequência")
+            if dados['Identificação'] is None:
+                erros.append("Identificação da Emissão")
+            if dados['Autorizado? (Q)'] is None:
+                erros.append("Autorizado?")
+            if dados['Interferente?'] is None:
+                erros.append("Interferente?")
             if dados['UTE?'] and not dados['Processo SEI ou ATO UTE'].strip():
                 erros.append("Processo SEI ou ATO UTE")
-            if not dados['Observações/Detalhes/Contatos'].strip(): erros.append("Observações/Detalhes/Contatos")
-            if not dados['Situação']: erros.append("Situação")
+            if not dados['Observações/Detalhes/Contatos'].strip():
+                erros.append("Observações/Detalhes/Contatos")
+            if not dados['Situação']:
+                erros.append("Situação")
 
             if erros:
                 st.error("Campos obrigatórios: " + ", ".join(erros))
@@ -1059,18 +1152,17 @@ def tela_bsr_erb(client):
             if k in st.session_state: del st.session_state[k]
         st.session_state.view = 'main_menu'; st.rerun()
 
-# ======================= NOVA TELA: BUSCA =========================
+# ======================= TELA: BUSCA =======================
 def tela_busca(client):
     render_header()
     st.divider()
 
     st.markdown(
-        '<div class="info-green">Busca por emissão específica no campo "Ocorrência (observações)"</div>',
+        '<div class="info-green">Busca por emissão específica (campo "Ocorrência (observações)" ou, na falta dele, em todas as colunas)</div>',
         unsafe_allow_html=True
     )
 
     termo = st.text_input("Digite o texto para buscar (mín. 3 caracteres):", value="")
-    # Seleção das abas
     opcoes_abas = ["PAINEL", "Abordagem"] + TODAS_ABAS_RFEYE
     sel_abas = st.multiselect("Escolha as abas onde buscar (padrão: todas):", options=opcoes_abas, default=opcoes_abas)
 
@@ -1082,14 +1174,30 @@ def tela_busca(client):
         if len(termo.strip()) < 3:
             st.warning("Digite pelo menos 3 caracteres para buscar.")
         else:
-            # Executa a busca
             with st.spinner("Procurando..."):
                 df_res = _buscar_por_texto_livre(client, termo.strip(), sel_abas)
             if df_res.empty:
                 st.info("Nenhum resultado encontrado para sua busca.")
             else:
                 st.success(f"Resultados encontrados: {len(df_res)}")
-                st.dataframe(df_res, use_container_width=True, hide_index=True)
+
+                for i, (_, row) in enumerate(df_res.iterrows(), start=1):
+                    cabecalho = []
+                    if "Local" in row and str(row["Local"]).strip():
+                        cabecalho.append(str(row["Local"]).strip())
+                    elif "Local/Região" in row and str(row["Local/Região"]).strip():
+                        cabecalho.append(str(row["Local/Região"]).strip())
+                    if "Data" in row and str(row["Data"]).strip():
+                        cabecalho.append(str(row["Data"]).strip())
+                    if "Frequência (MHz)" in row and str(row["Frequência (MHz)"]).strip():
+                        cabecalho.append(f'{row["Frequência (MHz)"]} MHz')
+                    if "ID" in row and str(row["ID"]).strip():
+                        cabecalho.append(f'ID {row["ID"]}')
+
+                    titulo = " | ".join(cabecalho) if cabecalho else f"Resultado #{i}"
+                    with st.expander(titulo, expanded=False):
+                        key_prefix = f"busca_{i}_{row.get('ID','semid')}"
+                        render_ocorrencia_readonly(row, key_prefix=key_prefix)
 
     if botao_voltar(key="voltar_busca"):
         st.session_state.view = 'main_menu'
