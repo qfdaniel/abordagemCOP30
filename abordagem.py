@@ -27,7 +27,7 @@ OBRIG = ":red[**\\***]"  # asterisco obrigatório
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1b2GOAOIN6mvgLH1rpvRD1vF4Ro9VOqylKkXaUTAq0Ro/edit"
 
 # Link do botão "Mapa das Estações"
-MAPS_URL = "https://www.google.com/maps/search/?api=1&query=Minha%20localiza%C3%A7%C3%A3o&zoom=14"
+MAPS_URL = "https://www.google.com/maps/d/u/0/edit?mid=1E7uIgoEchrY_KQn4jzu4ePs8WrdWwxc&usp=sharing"
 
 # Mapeamento RFeye -> Região (para dropdown do 1º botão)
 MAPEAMENTO_CODIGO = {
@@ -1186,3 +1186,4 @@ try:
 except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
     st.exception(e)
+
