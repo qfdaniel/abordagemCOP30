@@ -1187,3 +1187,4 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
     st.exception(e)
 
+
