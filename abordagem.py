@@ -113,10 +113,10 @@ st.markdown(f"""
   /* Remove span do header */
   span[data-testid="stHeaderActionElements"] {{ display: none !important; }}
 
-  /* Reduz o espaço do hr logo após o título */
+  /* Remove o espaço acima do primeiro botão (controlando o hr) */
   .header-logos + div[data-testid="stElementContainer"] hr {{
-    margin-top: .2rem !important;
-    margin-bottom: .2rem !important;
+    margin-top: 0 !important;
+    margin-bottom: .5rem !important; /* Ajusta o espaço abaixo da linha, antes do botão */
   }}
   /* Reduz hr em geral */
   div[data-testid="stMarkdownContainer"] hr {{
@@ -185,15 +185,13 @@ st.markdown(f"""
     font-weight: 500 !important;
   }}
 
-  /* === 3 PRIMEIROS BOTÕES DO MENU: VERMELHO GRADIENTE (CORRIGIDO) === */
-  #menu-botoes div[data-testid="stElementContainer"]:nth-of-type(-n+3) .stButton > button {{
-    background: linear-gradient(to bottom, #a31616, #d64545) !important;
-    border-color: #7a1f1f !important;
-    text-shadow: 0 1px 0 rgba(0,0,0,.55), 0 0 2px rgba(0,0,0,.35) !important;
-  }}
-  #menu-botoes div[data-testid="stElementContainer"]:nth-of-type(-n+3) .stButton > button:hover {{
-    filter: brightness(1.05) !important;
-    border-color: #fff !important;
+  /* === 3 PRIMEIROS BOTÕES DO MENU: VERMELHO GRADIENTE (VIBRANTE) === */
+  /* Este seletor identifica a coluna central (2 de 3) e aplica o estilo 
+     nos 3 primeiros containers de elementos dentro dela */
+  div[data-testid="stHorizontalBlock"] > div[data-testid="stVerticalBlock"]:nth-of-type(2) > div[data-testid="stElementContainer"]:nth-of-type(-n+3) .stButton > button {{
+    background: linear-gradient(to bottom, #c62828, #e53935) !important;
+    border-color: #a92222 !important;
+    text-shadow: 0 1px 1px rgba(0,0,0,.4) !important;
   }}
   
   .confirm-warning{{ background:linear-gradient(to bottom, #d9534f, #c9302c); color:white; font-weight:800; text-align:center; padding:1rem; border-radius:8px; margin-bottom:1rem; }}
@@ -913,7 +911,6 @@ def tela_menu_principal():
     with center_col:
         _, button_col, _ = st.columns([0.5, 9, 0.5])
         with button_col:
-            st.markdown('<div id="menu-botoes">', unsafe_allow_html=True)
             if st.button("**📋 INSERIR** emissão verificada em campo", use_container_width=True, key="btn_inserir"):
                 st.session_state.view = 'inserir'; st.rerun()
 
@@ -922,16 +919,15 @@ def tela_menu_principal():
 
             if st.button("**📵 REGISTRAR** Jammer ou ERB Fake", use_container_width=True, key="btn_bsr"):
                 st.session_state.view = 'bsr_erb'; st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
 
             if st.button("**🔎 PESQUISAR** dados de emissões", use_container_width=True, key="btn_buscar"):
                 st.session_state.view = 'busca'; st.rerun()
 
-            if st.button("📊 CONSULTAR Atos UTE", use_container_width=True, key="btn_ute"):
+            if st.button("🗒️ **CONSULTAR** Atos de UTE", use_container_width=True, key="btn_ute"):
                 st.session_state.view = 'tabela_ute'; st.rerun()
             
-            st.markdown(f'<a class="app-btn" href="{MAPS_URL}" target="_blank" rel="noopener noreferrer">🗺️ Mapa das Estações</a>', unsafe_allow_html=True)
-            st.link_button("🌍 Tradutor de Voz", "https://translate.google.com/?sl=auto&tl=pt&op=translate", use_container_width=True)
+            st.link_button("🗺️ Mapa das Estações", MAPS_URL, use_container_width=True)
+            st.link_button("🌍 **Tradutor de Voz**", "https://translate.google.com/?sl=auto&tl=pt&op=translate", use_container_width=True)
 
 def tela_consultar(client):
     render_header()
@@ -1327,4 +1323,3 @@ try:
 except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
     st.exception(e)
-
