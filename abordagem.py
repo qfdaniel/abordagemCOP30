@@ -105,7 +105,19 @@ st.markdown(f"""
   .block-container {{ max-width: 760px; padding-top: .45rem; padding-bottom: .55rem; margin: 0 auto; }}
   .stApp {{ background-color: #D7D6D4; }}
   #MainMenu, footer, header {{ visibility: hidden; }}
+...
+  #MainMenu, footer, header {{ visibility: hidden; }}
 
+  /* =========================================
+     CORREÇÃO DO GAP HORIZONTAL DAS COLUNAS
+     ========================================= */
+  div[data-testid="stHorizontalBlock"] {{
+    gap: 0rem !important;
+  }}
+
+  /* Labels pretos + leve sombra */
+  div[data-testid="stWidgetLabel"] > label {{ color:#000 !important; text-shadow: 0 1px 0 rgba(0,0,0,.05); }}
+...
   /* Labels pretos + leve sombra */
   div[data-testid="stWidgetLabel"] > label {{ color:#000 !important; text-shadow: 0 1px 0 rgba(0,0,0,.05); }}
   legend {{ color:#000 !important; text-shadow: 0 1px 0 rgba(0,0,0,.05); }}
