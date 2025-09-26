@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Optional, Dict, List
 
 # ================= AJUSTES RÁPIDOS (estilo) =================
-# Altura aumentada em 15% (3.68 * 1.15 = 4.23) e espaçamento ajustado
-BTN_HEIGHT = "4.23em"  # Altura de TODOS os botões
-BTN_GAP    = "12px"    # Espaçamento vertical unificado
+# Altura aumentada +10% (4.65 * 1.10 = 5.12) e espaçamento reduzido
+BTN_HEIGHT = "5.12em"  # Altura de TODOS os botões
+BTN_GAP    = "3px"     # Espaçamento vertical unificado
 # ============================================================
 
 # --- CONFIG DA PÁGINA ---
@@ -116,7 +116,7 @@ st.markdown(f"""
   /* AJUSTE NA LINHA E ESPAÇAMENTO - INÍCIO */
   .header-logos + div[data-testid="stElementContainer"] hr {{
     margin-top: 0 !important;
-    margin-bottom: .12rem !important;      /* Espaço reduzido pela metade */
+    margin-bottom: .06rem !important;      /* Espaço entre linha e 1º botão (reduzido) */
     height: 2px !important;                /* Linha um pouco mais grossa */
     background-color: #888 !important;     /* Cor da linha */
     border: none !important;               /* Remove a borda padrão */
@@ -208,8 +208,8 @@ st.markdown(f"""
      ========================================= */
   @media (max-width: 420px){{
     :root{{
-      --btn-height: 2.9em;
-      --btn-gap: 8px;
+      --btn-height: 3.5em; /* Altura AUMENTADA para mobile */
+      --btn-gap: 4px;      /* Espaçamento REDUZIDO para mobile */
       --btn-font: 0.98em;
     }}
     .hdr-img{{ height:38px; }}
