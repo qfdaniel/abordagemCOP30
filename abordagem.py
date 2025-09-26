@@ -182,6 +182,11 @@ st.markdown(f"""
 
   /* --- ESTILO DOS BOTÕES VERMELHOS (CORREÇÃO FINAL) --- */
   #marker-vermelho {{ display: none; }} /* Oculta a âncora */
+  
+  /* Remove o espaço do container da âncora */
+  div[data-testid="stElementContainer"]:has(#marker-vermelho) {{
+      margin-bottom: 0 !important;
+  }}
 
   /* Seleciona o container da âncora, e a partir dele, os 3 containers de botão seguintes */
   div[data-testid="stElementContainer"]:has(#marker-vermelho) ~ div[data-testid="stElementContainer"]:nth-of-type(-n+4) .stButton > button {{
