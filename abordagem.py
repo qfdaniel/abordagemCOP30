@@ -942,7 +942,7 @@ def tela_consultar(client):
     render_header()
     st.divider()
 
-    st.markdown('<div class="info-green">Consulte as emissões pendentes de identificação<br>(Sugestão: verifique por região)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="info-green">Consulte as emissões pendentes de identificação para verificação em campo (em caso de sucesso, alterar Situação de Pendente para Concluído<br>(Sugestão: verifique por região)</div>', unsafe_allow_html=True)
 
     df_painel = carregar_pendencias_painel_mapeadas(client)
     df_abord  = carregar_pendencias_abordagem_pendentes(client)
@@ -1155,7 +1155,7 @@ def tela_busca(client):
     render_header()
     st.divider()
 
-    st.markdown('<div class="info-green">Consulta por texto livre em "Ocorrência (observações)" ou, na ausência, em colunas textuais relevantes.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="info-green">Consulta por texto livre em quaisquer campos (frequência, nomes, telefones etc.).</div>', unsafe_allow_html=True)
 
     termo = st.text_input("Digite o texto para consultar (mín. 3 caracteres):", value="")
     opcoes_abas = ["PAINEL", "Abordagem"] + TODAS_ABAS_RFEYE
