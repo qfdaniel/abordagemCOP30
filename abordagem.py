@@ -180,15 +180,11 @@ st.markdown(f"""
      background: linear-gradient(to bottom, #14337b, #4464A7) !important;
   }}
 
-  /* Escopo do MENU: fonte um pouco menor */
-  #menu-botoes .stButton > button {{
-    font-weight: 500 !important;
-  }}
+  /* --- ESTILO DOS BOTÕES VERMELHOS (CORREÇÃO FINAL) --- */
+  #marker-vermelho {{ display: none; }} /* Oculta a âncora */
 
-  /* === 3 PRIMEIROS BOTÕES DO MENU: VERMELHO GRADIENTE (VIBRANTE) === */
-  /* Este seletor identifica a coluna central (2 de 3) e aplica o estilo 
-     nos 3 primeiros containers de elementos dentro dela */
-  div[data-testid="stHorizontalBlock"] > div[data-testid="stVerticalBlock"]:nth-of-type(2) > div[data-testid="stElementContainer"]:nth-of-type(-n+3) .stButton > button {{
+  /* Seleciona o container da âncora, e a partir dele, os 3 containers de botão seguintes */
+  div[data-testid="stElementContainer"]:has(#marker-vermelho) ~ div[data-testid="stElementContainer"]:nth-of-type(-n+4) .stButton > button {{
     background: linear-gradient(to bottom, #c62828, #e53935) !important;
     border-color: #a92222 !important;
     text-shadow: 0 1px 1px rgba(0,0,0,.4) !important;
@@ -911,6 +907,9 @@ def tela_menu_principal():
     with center_col:
         _, button_col, _ = st.columns([0.5, 9, 0.5])
         with button_col:
+            # Âncora invisível para o CSS encontrar e estilizar os 3 botões seguintes
+            st.markdown('<div id="marker-vermelho"></div>', unsafe_allow_html=True)
+
             if st.button("**📋 INSERIR** emissão verificada em campo", use_container_width=True, key="btn_inserir"):
                 st.session_state.view = 'inserir'; st.rerun()
 
@@ -1067,7 +1066,7 @@ def tela_inserir(client):
             'Faixa de Frequência': st.selectbox(f"Faixa de Frequência {OBRIG}", options=FAIXA_OPCOES, index=None, placeholder="Selecione..."),
             'Identificação': st.selectbox(f"Identificação da Emissão {OBRIG}", options=opcoes_identificacao, index=None, placeholder="Selecione..."),
             'Autorizado? (Q)': st.selectbox(f"Autorizado? {OBRIG}", options=["Sim", "Não", "Não licenciável"], index=None, placeholder="Selecione..."),
-            'Responsável pela emissão': st.text_input("Responsável pela Emissão"),
+            'Responsável pela emissão': st.text_input("Responsável pela emissão (Pessoa ou Empresa)"),
             'Interferente?': st.selectbox(f"Interferente? {OBRIG}", ("Sim", "Não", "Indefinido"), index=None, placeholder="Selecione..."),
             'UTE?': st.checkbox("UTE?"),
             'Processo SEI ou ATO UTE': st.text_input("Processo SEI ou ATO UTE"),
