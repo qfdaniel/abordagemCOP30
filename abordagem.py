@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Optional, Dict, List
 
 # ================= AJUSTES RÁPIDOS (estilo) =================
-# Altura aumentada em 15% (3.2 * 1.15 = 3.68) e espaçamento ajustado
-BTN_HEIGHT = "3.68em"  # Altura de TODOS os botões
+# Altura aumentada em 15% (3.68 * 1.15 = 4.23) e espaçamento ajustado
+BTN_HEIGHT = "4.23em"  # Altura de TODOS os botões
 BTN_GAP    = "12px"    # Espaçamento vertical unificado
 # ============================================================
 
@@ -212,6 +212,12 @@ st.markdown(f"""
     .header-logos h2{{ font-size:1.42rem; }}
     .block-container{{ padding:.4rem .6rem; }}
     div[data-testid="stDivider"]{{ margin: .25rem 0 .25rem 0 !important; }}
+
+    .ute-table th, .ute-table td {{
+        padding: 4px;
+        font-size: 0.85em;
+        word-break: break-word;
+    }}
   }}
 
   /* Tradutor de Voz (último botão) VERDE CLARO */
@@ -907,9 +913,7 @@ def tela_menu_principal():
     with center_col:
         _, button_col, _ = st.columns([0.5, 9, 0.5])
         with button_col:
-            # Contêiner para escopo de CSS no menu
             st.markdown('<div id="menu-botoes">', unsafe_allow_html=True)
-
             if st.button("**📋 INSERIR** emissão verificada em campo", use_container_width=True, key="btn_inserir"):
                 st.session_state.view = 'inserir'; st.rerun()
 
@@ -923,15 +927,10 @@ def tela_menu_principal():
             if st.button("**🔎 PESQUISAR** dados de emissões", use_container_width=True, key="btn_buscar"):
                 st.session_state.view = 'busca'; st.rerun()
 
-            # Botão para a nova tela da Tabela UTE
             if st.button("📊 CONSULTAR Atos UTE", use_container_width=True, key="btn_ute"):
-                st.session_state.view = 'tabela_ute'
-                st.rerun()
+                st.session_state.view = 'tabela_ute'; st.rerun()
             
-            # ÍCONE DO MAPA SUBSTITUÍDO
             st.markdown(f'<a class="app-btn" href="{MAPS_URL}" target="_blank" rel="noopener noreferrer">🗺️ Mapa das Estações</a>', unsafe_allow_html=True)
-
-            # Botão tradutor
             st.link_button("🌍 Tradutor de Voz", "https://translate.google.com/?sl=auto&tl=pt&op=translate", use_container_width=True)
 
 def tela_consultar(client):
@@ -1222,37 +1221,29 @@ def tela_tabela_ute(client):
     render_header()
     st.divider()
     st.markdown("#### Atos de UTE - COP30")
+    st.markdown("<p style='text-align: center; font-size: small; margin-top: -0.5rem; margin-bottom: 0.5rem;'>(gire o celular ⟳)</p>", unsafe_allow_html=True)
+
 
     # Injeta o JavaScript para a funcionalidade de copiar
     st.markdown("""
     <script>
     function copyToClipboard(text, element) {
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(text).then(function() {
-                element.innerHTML = "Copiado! ✔️";
-                setTimeout(() => { element.innerHTML = text + " 📋"; }, 1500);
-            }, function(err) {
-                element.innerHTML = "Falhou!";
-                setTimeout(() => { element.innerHTML = text + " 📋"; }, 1500);
-            });
-        } else {
-            // Fallback para ambientes não seguros (como o Streamlit Cloud em alguns casos)
-            const el = document.createElement('textarea');
-            el.value = text;
-            el.style.position = 'absolute';
-            el.style.left = '-9999px';
-            document.body.appendChild(el);
-            el.select();
-            try {
-                document.execCommand('copy');
-                element.innerHTML = "Copiado! ✔️";
-                setTimeout(() => { element.innerHTML = text + " 📋"; }, 1500);
-            } catch (err) {
-                element.innerHTML = "Falhou!";
-                setTimeout(() => { element.innerHTML = text + " 📋"; }, 1500);
-            }
-            document.body.removeChild(el);
+        // Fallback para ambientes não seguros
+        const el = document.createElement('textarea');
+        el.value = text;
+        el.style.position = 'absolute';
+        el.style.left = '-9999px';
+        document.body.appendChild(el);
+        el.select();
+        try {
+            var successful = document.execCommand('copy');
+            var msg = successful ? 'Copiado! ✔️' : 'Falhou!';
+            element.innerHTML = msg;
+        } catch (err) {
+            element.innerHTML = 'Falhou!';
         }
+        document.body.removeChild(el);
+        setTimeout(() => { element.innerHTML = text; }, 1500);
     }
     </script>
     """, unsafe_allow_html=True)
@@ -1298,7 +1289,7 @@ def tela_tabela_ute(client):
             html += f"<td>{_safe_str(row['País'])}</td>"
             html += f"<td>{_safe_str(row['Frequência (MHz)'])}</td>"
             html += f"<td>{_safe_str(row['Largura (kHz)'])}</td>"
-            html += f"<td class='copyable-cell' onclick='copyToClipboard(\"{processo_sei}\", this)'>{processo_sei} 📋</td>"
+            html += f"<td class='copyable-cell' onclick='copyToClipboard(\"{processo_sei}\", this)'>{processo_sei}</td>"
             html += "</tr>"
         html += "</tbody></table>"
         st.markdown(html, unsafe_allow_html=True)
