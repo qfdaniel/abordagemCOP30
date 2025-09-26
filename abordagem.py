@@ -767,12 +767,10 @@ def _buscar_por_texto_livre(client, termos: str, abas: List[str]) -> pd.DataFram
             if df.empty:
                 continue
 
-            # CORREÇÃO: Pré-filtra o DataFrame para buscar apenas em linhas que contêm dados reais.
+            # CORREÇÃO FINAL: Filtro mais rigoroso para remover linhas de "template"
+            # Uma linha é considerada um registro válido se tiver dados em "Fiscal" ou "Ocorrência".
             key_fields_for_validation = [
-                "Fiscal", "Data", "Dia", "DD/MM/AAAA", "HH:mm",
-                "Frequência (MHz)", "Frequencia (MHz)", "Frequência",
-                "Ocorrência (obsevações)", "Observações/Detalhes/Contatos", "Identificação",
-                "Largura (kHz)", "Largura", "Local", "Local/Região"
+                "Fiscal", "Ocorrência (obsevações)", "Observações/Detalhes/Contatos"
             ]
 
             available_validation_keys = []
@@ -912,25 +910,24 @@ def tela_menu_principal():
             # Contêiner para escopo de CSS no menu
             st.markdown('<div id="menu-botoes">', unsafe_allow_html=True)
 
-            if st.button("**📝 INSERIR** emissão verificada em campo", use_container_width=True, key="btn_inserir"):
+            if st.button("**📋 INSERIR** emissão verificada em campo", use_container_width=True, key="btn_inserir"):
                 st.session_state.view = 'inserir'; st.rerun()
 
-            if st.button("**🧾 TRATAR** emissões pendentes", use_container_width=True, key="btn_consultar"):
+            if st.button("**📝 TRATAR** emissões pendentes", use_container_width=True, key="btn_consultar"):
                 st.session_state.view = 'consultar'; st.rerun()
 
-            if st.button("**📡 REGISTRAR** Jammer ou ERB Fake", use_container_width=True, key="btn_bsr"):
+            if st.button("**📵 REGISTRAR** Jammer ou ERB Fake", use_container_width=True, key="btn_bsr"):
                 st.session_state.view = 'bsr_erb'; st.rerun()
-
             st.markdown('</div>', unsafe_allow_html=True)
-            
-            if st.button("🔎 Consultar dados de emissões", use_container_width=True, key="btn_buscar"):
+
+            if st.button("**🔎 PESQUISAR** dados de emissões", use_container_width=True, key="btn_buscar"):
                 st.session_state.view = 'busca'; st.rerun()
 
             # Botão para a nova tela da Tabela UTE
             if st.button("📊 CONSULTAR Atos UTE", use_container_width=True, key="btn_ute"):
                 st.session_state.view = 'tabela_ute'
                 st.rerun()
-
+            
             # ÍCONE DO MAPA SUBSTITUÍDO
             st.markdown(f'<a class="app-btn" href="{MAPS_URL}" target="_blank" rel="noopener noreferrer">🗺️ Mapa das Estações</a>', unsafe_allow_html=True)
 
