@@ -18,14 +18,14 @@ BTN_GAP    = "12px"    # Espaçamento vertical unificado
 
 # --- CONFIG DA PÁGINA ---
 st.set_page_config(
-    page_title="Abordagem - COP30",
+    page_title="App COP30",
     page_icon="logo.png",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
 # --- CONSTANTES ---
-TITULO_PRINCIPAL = "Abordagem - COP30"
+TITULO_PRINCIPAL = "App COP30"
 OBRIG = ":red[**\\***]"  # asterisco obrigatório
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1b2GOAOIN6mvgLH1rpvRD1vF4Ro9VOqylKkXaUTAq0Ro/edit"
 
@@ -116,7 +116,7 @@ st.markdown(f"""
   /* Remove o espaço acima do primeiro botão (controlando o hr) */
   .header-logos + div[data-testid="stElementContainer"] hr {{
     margin-top: 0 !important;
-    margin-bottom: .5rem !important; /* Ajusta o espaço abaixo da linha, antes do botão */
+    margin-bottom: .25rem !important; /* Ajusta o espaço abaixo da linha, antes do botão */
   }}
   /* Reduz hr em geral */
   div[data-testid="stMarkdownContainer"] hr {{
