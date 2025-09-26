@@ -113,15 +113,21 @@ st.markdown(f"""
   /* Remove span do header */
   span[data-testid="stHeaderActionElements"] {{ display: none !important; }}
 
-  /* Adiciona espaço controlado acima do bloco de botões */
-  #botoes-menu {{
-      padding-top: 0.5rem;
+  /* Remove o espaço acima do primeiro botão (controlando o hr) */
+  .header-logos + div[data-testid="stElementContainer"] hr {{
+    margin-top: 0 !important;
+    margin-bottom: .25rem !important; /* Ajusta o espaço abaixo da linha, antes do botão */
+  }}
+  /* Reduz hr em geral */
+  div[data-testid="stMarkdownContainer"] hr {{
+    margin-top: .35rem !important;
+    margin-bottom: .35rem !important;
   }}
 
   /* ===== Header (título + logos) ===== */
   .header-logos {{
     display: grid; grid-template-columns: 1fr auto 1fr;
-    align-items: center; gap: 12px; text-align: center; margin-bottom: 0.2rem;
+    align-items: center; gap: 12px; text-align: center; margin-bottom: .05rem;
   }}
   .hdr-img {{ height:56px; }}
   .hdr-left {{ justify-self: end; }}
@@ -175,8 +181,16 @@ st.markdown(f"""
   }}
 
   /* --- ESTILO DOS BOTÕES VERMELHOS (CORREÇÃO FINAL) --- */
-  #botoes-menu div[data-testid="stElementContainer"]:nth-child(-n+3) .stButton > button {{
-    background: linear-gradient(to bottom, #d13028, #f2524a) !important; /* Vermelho um pouco mais claro */
+  #marker-vermelho {{ display: none; }} /* Oculta a âncora */
+  
+  /* Remove o espaço do container da âncora */
+  div[data-testid="stElementContainer"]:has(#marker-vermelho) {{
+      margin-bottom: 0 !important;
+  }}
+
+  /* Seleciona o container da âncora, e a partir dele, os 3 containers de botão seguintes */
+  div[data-testid="stElementContainer"]:has(#marker-vermelho) ~ div[data-testid="stElementContainer"]:nth-of-type(-n+4) .stButton > button {{
+    background: linear-gradient(to bottom, #c62828, #e53935) !important;
     border-color: #a92222 !important;
     text-shadow: 0 1px 1px rgba(0,0,0,.4) !important;
   }}
@@ -892,12 +906,14 @@ def render_ocorrencia_readonly(row: pd.Series, key_prefix: str):
 # ========================= TELAS =========================
 def tela_menu_principal():
     render_header()
-    
+    st.divider()
+
     _, center_col, _ = st.columns([1, 2, 1])
     with center_col:
         _, button_col, _ = st.columns([0.5, 9, 0.5])
         with button_col:
-            st.markdown('<div id="botoes-menu">', unsafe_allow_html=True) # Container para o espaçamento e CSS
+            # Âncora invisível para o CSS encontrar e estilizar os 3 botões seguintes
+            st.markdown('<div id="marker-vermelho"></div>', unsafe_allow_html=True)
 
             if st.button("**📋 INSERIR** emissão verificada em campo", use_container_width=True, key="btn_inserir"):
                 st.session_state.view = 'inserir'; st.rerun()
@@ -916,8 +932,6 @@ def tela_menu_principal():
             
             st.link_button("🗺️ Mapa das Estações", MAPS_URL, use_container_width=True)
             st.link_button("🌍 **Tradutor de Voz**", "https://translate.google.com/?sl=auto&tl=pt&op=translate", use_container_width=True)
-
-            st.markdown('</div>', unsafe_allow_html=True)
 
 def tela_consultar(client):
     render_header()
