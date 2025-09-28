@@ -687,7 +687,7 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
 
         faixa_val = (dados_formulario.get("Faixa de Frequência", "") or "").strip()
         ute_val = "Sim" if dados_formulario.get("UTE?") else "Não"
-        proc_val = (dados_formulario.get("Processo SEI ou ATO UTE", "") or "").strip()
+        proc_val = (dados_formulario.get("Processo SEI ou Ato UTE", "") or "").strip()
         obs_val = (dados_formulario.get("Observações/Detalhes/Contatos", "") or "").strip()
         resp_val = (dados_formulario.get("Responsável pela emissão", "") or "").strip()
         autoriz  = (dados_formulario.get("Autorizado? (Q)", "") or "").strip()
@@ -1346,6 +1346,7 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
+
 
 
 
