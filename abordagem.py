@@ -1085,7 +1085,7 @@ def tela_inserir(client):
             'Fiscal': st.text_input(f"Fiscal Responsável {OBRIG}"),
             'Local/Região': st.text_input("Local/Região"),
             'Frequência em MHz': st.number_input(f"Frequência (MHz) {OBRIG}", format="%.3f", step=0.001, min_value=0.0),
-            'Largura em kHz': st.number_input(f"Largura em kHz {OBRIG}", format="%.1f", step=0.1, min_value=0.0),
+            'Largura em kHz': st.number_input(f"Largura (kHz) {OBRIG}", format="%.1f", step=0.1, min_value=0.0),
             'Faixa de Frequência': st.selectbox(f"Faixa de Frequência {OBRIG}", options=FAIXA_OPCOES, index=None, placeholder="Selecione..."),
             'Identificação': st.selectbox(f"Identificação da Emissão {OBRIG}", options=opcoes_identificacao, index=None, placeholder="Selecione..."),
             'Autorizado? (Q)': st.selectbox(f"Autorizado? {OBRIG}", options=["Sim", "Não", "Não licenciável"], index=None, placeholder="Selecione..."),
@@ -1346,5 +1346,6 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
+
 
 
