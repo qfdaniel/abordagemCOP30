@@ -4,6 +4,7 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime, date
+from zoneinfo import ZoneInfo
 import re
 import base64
 import unicodedata
@@ -1076,8 +1077,8 @@ def tela_inserir(client):
 
     opcoes_identificacao = carregar_opcoes_identificacao(client)
     with st.form("form_nova_emissao", clear_on_submit=False):
-        hora_padrao = datetime.now().time().replace(second=0, microsecond=0)
-
+        fuso_horario_gmt3 = ZoneInfo("America/Sao_Paulo")
+        hora_padrao = datetime.now(fuso_horario_gmt3).time().replace(second=0, microsecond=0)
         dados = {
             'Dia': st.date_input(f"Data (DD/MM/AAAA) {OBRIG}"),
             'Hora': st.time_input(f"Hora {OBRIG}", value=hora_padrao),
@@ -1345,3 +1346,4 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
+
