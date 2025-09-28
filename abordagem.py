@@ -947,7 +947,7 @@ def tela_menu_principal():
             if st.button("🗒️ **CONSULTAR** Atos de UTE", use_container_width=True, key="btn_ute"):
                 st.session_state.view = 'tabela_ute'; st.rerun()
             
-            st.link_button("🗺️ Mapa das Estações", MAPS_URL, use_container_width=True)
+            st.link_button("🗺️ **Mapa das Estações**", MAPS_URL, use_container_width=True)
             st.link_button("🌍 **Tradutor de Voz**", "https://translate.google.com/?sl=auto&tl=pt&op=translate", use_container_width=True)
 
 def tela_consultar(client):
@@ -1343,4 +1343,5 @@ try:
         tela_tabela_ute(client)
 except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
+
     st.exception(e)
