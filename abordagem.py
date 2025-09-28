@@ -880,7 +880,7 @@ def render_ocorrencia_readonly(row: pd.Series, key_prefix: str):
     ident_atual = _get_val(["Identificação", "Identificação.1"])
     autz_atual  = _get_val(["Autorizado?", "Autorizado?.1", "Autorizado? (Q)"])
     ute_atual   = _get_val(["UTE?", "UTE?.1"])
-    proc_sei    = _get_val(["Processo SEI UTE", "Processo SEI UTE.1", "Processo SEI ou ATO UTE"])
+    proc_sei    = _get_val(["Processo SEI UTE", "Processo SEI UTE.1", "Processo SEI ou Ato UTE"])
     obs_txt     = _get_val(["Ocorrência (obsevações)", "Ocorrência (obsevações).1", "Observações/Detalhes/Contatos"])
     ciente_txt  = _get_val(["Alguém mais ciente?", "Alguém mais ciente?.1"])
     interf_at   = _get_val(["Interferente?", "Interferente?.1"])
@@ -1346,6 +1346,7 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
+
 
 
 
