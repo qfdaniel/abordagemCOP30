@@ -1080,7 +1080,7 @@ def tela_inserir(client):
         fuso_horario_gmt3 = ZoneInfo("America/Sao_Paulo")
         hora_padrao = datetime.now(fuso_horario_gmt3).time().replace(second=0, microsecond=0)
         dados = {
-            'Dia': st.date_input(f"Data (DD/MM/AAAA) {OBRIG}"),
+            'Dia': st.date_input(f"Data {OBRIG}"),
             'Hora': st.time_input(f"Hora {OBRIG}", value=hora_padrao),
             'Fiscal': st.text_input(f"Fiscal Responsável {OBRIG}"),
             'Local/Região': st.text_input("Local/Região"),
@@ -1346,4 +1346,5 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
+
 
