@@ -31,7 +31,7 @@ OBRIG = ":red[**\\***]"  # asterisco obrigatório
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1b2GOAOIN6mvgLH1rpvRD1vF4Ro9VOqylKkXaUTAq0Ro/edit"
 
 # Link do botão "Mapa das Estações" (atualizado)
-MAPS_URL = "https://www.google.com/maps/d/u/0/edit?mid=1E7uIgoEchrY_KQn4jzu4ePs8WrdWwxc&usp=sharing"
+MAPS_URL = "http://googleusercontent.com/maps/google.com/0"
 
 # Mapeamento RFeye -> Região (para dropdown do 1º botão)
 MAPEAMENTO_CODIGO = {
@@ -678,14 +678,25 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
         if faixa_val == "":
             return False
 
+        # ▼▼▼ CÓDIGO CORRIGIDO ▼▼▼
         vals_I_to_W = [
-            "Abordagem", "Abordagem",
-            dados_formulario.get("Fiscal", ""), dia_val, hora_val,
+            # I: Local, J: Fiscal, K: Data, L: Hora, M: Freq, N: Larg, O: Faixa,
+            # P: Identificação, Q: Autorizado, R: UTE, S: Processo, T: Obs,
+            # U: Ciente (vazio), V: Interferente, W: Situação
+            dados_formulario.get("Local/Região", "Abordagem"),
+            dados_formulario.get("Fiscal", ""),
+            dia_val, hora_val,
             freq_val, larg_val, faixa_val,
-            dados_formulario.get("Identificação",""), autoriz, ute_val,
-            proc_val, t_concat, "",
-            dados_formulario.get("Interferente?",""), situ_val,
+            dados_formulario.get("Identificação",""),
+            autoriz,
+            ute_val,
+            proc_val,
+            t_concat,
+            "", # Campo "Alguém mais ciente?" (Coluna U), que não está no formulário
+            dados_formulario.get("Interferente?",""),
+            situ_val,
         ]
+        # ▲▲▲ FIM DA CORREÇÃO ▲▲▲
 
         aba.update(f"H{row}", [[str(next_id)]], value_input_option="RAW")
         aba.update(f"I{row}:W{row}", [vals_I_to_W], value_input_option="RAW")
@@ -1304,5 +1315,4 @@ try:
         tela_tabela_ute(client)
 except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
-
     st.exception(e)
