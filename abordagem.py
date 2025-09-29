@@ -31,7 +31,7 @@ OBRIG = ":red[**\\***]"  # asterisco obrigatório
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1b2GOAOIN6mvgLH1rpvRD1vF4Ro9VOqylKkXaUTAq0Ro/edit"
 
 # Link do botão "Mapa das Estações" (atualizado)
-MAPS_URL = "https://www.google.com/maps/d/u/0/edit?mid=1E7uIgoEchrY_KQn4jzu4ePs8WrdWwxc&usp=sharing"
+MAPS_URL = "http://googleusercontent.com/maps/google.com/0"
 
 # Mapeamento RFeye -> Região (para dropdown do 1º botão)
 MAPEAMENTO_CODIGO = {
@@ -106,19 +106,7 @@ st.markdown(f"""
   .block-container {{ max-width: 760px; padding-top: .45rem; padding-bottom: .55rem; margin: 0 auto; }}
   .stApp {{ background-color: #D7D6D4; }}
   #MainMenu, footer, header {{ visibility: hidden; }}
-...
-  #MainMenu, footer, header {{ visibility: hidden; }}
 
-  /* =========================================
-     CORREÇÃO DO GAP HORIZONTAL DAS COLUNAS
-     ========================================= */
-  div[data-testid="stHorizontalBlock"] {{
-    gap: 0rem !important;
-  }}
-
-  /* Labels pretos + leve sombra */
-  div[data-testid="stWidgetLabel"] > label {{ color:#000 !important; text-shadow: 0 1px 0 rgba(0,0,0,.05); }}
-...
   /* Labels pretos + leve sombra */
   div[data-testid="stWidgetLabel"] > label {{ color:#000 !important; text-shadow: 0 1px 0 rgba(0,0,0,.05); }}
   legend {{ color:#000 !important; text-shadow: 0 1px 0 rgba(0,0,0,.05); }}
@@ -129,10 +117,10 @@ st.markdown(f"""
   /* AJUSTE NA LINHA E ESPAÇAMENTO - INÍCIO */
   .header-logos + div[data-testid="stElementContainer"] hr {{
     margin-top: 0 !important;
-    margin-bottom: .06rem !important;      /* Espaço entre linha e 1º botão (reduzido) */
-    height: 2px !important;                /* Linha um pouco mais grossa */
-    background-color: #888 !important;     /* Cor da linha */
-    border: none !important;               /* Remove a borda padrão */
+    margin-bottom: .06rem !important;
+    height: 2px !important;
+    background-color: #888 !important;
+    border: none !important;
   }}
   /* AJUSTE NA LINHA E ESPAÇAMENTO - FIM */
 
@@ -199,14 +187,12 @@ st.markdown(f"""
   }}
 
   /* --- ESTILO DOS BOTÕES VERMELHOS (CORREÇÃO FINAL) --- */
-  #marker-vermelho {{ display: none; }} /* Oculta a âncora */
+  #marker-vermelho {{ display: none; }}
   
-  /* Remove o espaço do container da âncora */
   div[data-testid="stElementContainer"]:has(#marker-vermelho) {{
       margin-bottom: 0 !important;
   }}
 
-  /* Seleciona o container da âncora, e a partir dele, os 3 containers de botão seguintes */
   div[data-testid="stElementContainer"]:has(#marker-vermelho) ~ div[data-testid="stElementContainer"]:nth-of-type(-n+4) .stButton > button {{
     background: linear-gradient(to bottom, #c62828, #e53935) !important;
     border-color: #a92222 !important;
@@ -221,8 +207,8 @@ st.markdown(f"""
      ========================================= */
   @media (max-width: 420px){{
     :root{{
-      --btn-height: 3.5em; /* Altura AUMENTADA para mobile */
-      --btn-gap: 4px;      /* Espaçamento REDUZIDO para mobile */
+      --btn-height: 3.5em;
+      --btn-gap: 4px;
       --btn-font: 0.98em;
     }}
     .hdr-img{{ height:38px; }}
@@ -242,6 +228,14 @@ st.markdown(f"""
     background: linear-gradient(to bottom, #2e7d32, #4caf50) !important;
     border-color: #1b5e20 !important;
   }}
+  
+  #marker-bsr-erb-form {{ display: none; }}
+
+  div[data-testid="stElementContainer"]:has(#marker-bsr-erb-form) ~ div[data-testid="stElementContainer"] div[data-testid="stForm"] .stButton > button {{
+    background: linear-gradient(to bottom, #2e7d32, #4caf50) !important;
+    border-color: #1b5e20 !important;
+  }}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -370,7 +364,6 @@ def _valid_neg_coord(value: str) -> bool:
         return True
     return re.match(r"^-\d+\.\d{6}$", v) is not None
 
-# ---------- Normalização para busca ----------
 def _normalize_text(s: str) -> str:
     if s is None:
         return ""
@@ -387,7 +380,6 @@ def _as_bool_sim(valor: str) -> bool:
     s = (str(valor or "")).strip().lower()
     return s in ("sim", "true", "1", "x", "ok")
 
-# --------- DEDUPLICAÇÃO DE NOMES DE COLUNAS ---------
 def _dedupe_columns_index(columns):
     counts = {}
     new_cols = []
@@ -401,7 +393,6 @@ def _dedupe_columns_index(columns):
             new_cols.append(name)
     return new_cols
 
-# --------- STRING SEGURA ---------
 def _safe_str(v) -> str:
     if v is None:
         return ""
@@ -411,7 +402,6 @@ def _safe_str(v) -> str:
         return ""
     return s
 
-# ========== LEITURA DE DADOS DAS ABAS ==========
 @st.cache_data(ttl=180)
 def carregar_dados_ute(_client):
     try:
@@ -421,12 +411,9 @@ def carregar_dados_ute(_client):
         matriz = aba.get_all_values()
         if not matriz or len(matriz) < 2:
             return pd.DataFrame()
-
-        # Colunas: A (País), E (Frequência), F (Largura), H (Processo)
-        # Índices baseados em 0: 0, 4, 5, 7
         dados = []
-        for row in matriz[1:]: # Pula o cabeçalho
-            if len(row) > 7: # Garante que a linha tem dados suficientes
+        for row in matriz[1:]:
+            if len(row) > 7:
                  dados.append({
                     "País": row[0],
                     "Frequência (MHz)": row[4],
@@ -435,7 +422,7 @@ def carregar_dados_ute(_client):
                 })
 
         df = pd.DataFrame(dados)
-        df = df[df["Processo SEI"].str.strip() != ""] # Filtra linhas sem Processo SEI
+        df = df[df["Processo SEI"].str.strip() != ""]
         return df
     except gspread.exceptions.WorksheetNotFound:
         st.error("Aba 'Tabela UTE' não encontrada na planilha.")
@@ -464,7 +451,6 @@ def carregar_pendencias_painel_mapeadas(_client):
         col_situ = col_like(lambda s: s == "situação", lambda s: s == "situacao")
         col_est  = col_like(lambda s: "estação" in s, lambda s: "estacao" in s)
         col_id   = col_like(lambda s: s == "id")
-
         col_fiscal   = col_like(lambda s: "fiscal" in s)
         col_data     = col_like(lambda s: s == "data" or s == "dia")
         col_hora     = col_like(lambda s: "hh" in s or "hora" in s or "h:" in s)
@@ -534,16 +520,16 @@ def carregar_pendencias_abordagem_pendentes(_client):
             idx = pos_map[pos_letter]
             return pd.Series([r[idx] if len(r)>idx else "" for r in rows])
 
-        colH = col_or_pos("H", "H")  # ID
-        colI = col_or_pos("I", "I")  # Local/Região
-        colJ = col_or_pos("J", "J")  # Fiscal
-        colK = col_or_pos("K", "K")  # Data
-        colM = col_or_pos("M", "M")  # Frequência
-        colN = col_or_pos("N", "N")  # Largura
-        colO = col_or_pos("O", "O")  # Faixa de Frequência
-        colT = col_or_pos("T", "T")  # Observações
-        colV = col_or_pos("V", "V")  # Interferente?
-        colW = col_or_pos("W", "W")  # Situação
+        colH = col_or_pos("H", "H")
+        colI = col_or_pos("I", "I")
+        colJ = col_or_pos("J", "J")
+        colK = col_or_pos("K", "K")
+        colM = col_or_pos("M", "M")
+        colN = col_or_pos("N", "N")
+        colO = col_or_pos("O", "O")
+        colT = col_or_pos("T", "T")
+        colV = col_or_pos("V", "V")
+        colW = col_or_pos("W", "W")
 
         pend = pd.DataFrame({
             "Local": colI.fillna("").astype(str),
@@ -575,7 +561,6 @@ def carregar_pendencias_abordagem_pendentes(_client):
         st.exception(e)
         return pd.DataFrame()
 
-# ============== ATUALIZAÇÃO NAS ABAS-MÃE ==============
 def _find_header_col_index(header_list: List[str], *preds) -> Optional[int]:
     for idx, name in enumerate(header_list, start=1):
         s = (name or "").strip().lower()
@@ -629,7 +614,6 @@ def atualizar_campos_na_aba_mae(_client, estacao_raw, id_ocorrencia, novos_valor
     except Exception as e:
         return f"ERRO ao atualizar a aba '{aba.title}': {e}"
 
-# ============== ATUALIZAÇÃO NA ABORDAGEM POR ID (H) ==============
 def atualizar_campos_abordagem_por_id(_client, id_h: str, novos_valores: Dict[str, str]) -> str:
     try:
         planilha = _client.open_by_url(URL_PLANILHA)
@@ -641,20 +625,13 @@ def atualizar_campos_abordagem_por_id(_client, id_h: str, novos_valores: Dict[st
         row_idx = cell.row
 
         writes = []
-        if "Identificação" in novos_valores:
-            writes.append(("P", novos_valores["Identificação"]))
-        if "Autorizado?" in novos_valores:
-            writes.append(("Q", novos_valores["Autorizado?"]))
-        if "UTE?" in novos_valores:
-            writes.append(("R", novos_valores["UTE?"]))
-        if "Processo SEI UTE" in novos_valores:
-            writes.append(("S", novos_valores["Processo SEI UTE"]))
-        if "Ocorrência (observações)" in novos_valores:
-            writes.append(("T", novos_valores["Ocorrência (observações)"]))
-        if "Interferente?" in novos_valores:
-            writes.append(("V", novos_valores["Interferente?"]))
-        if "Situação" in novos_valores:
-            writes.append(("W", novos_valores["Situação"]))
+        if "Identificação" in novos_valores: writes.append(("P", novos_valores["Identificação"]))
+        if "Autorizado?" in novos_valores: writes.append(("Q", novos_valores["Autorizado?"]))
+        if "UTE?" in novos_valores: writes.append(("R", novos_valores["UTE?"]))
+        if "Processo SEI UTE" in novos_valores: writes.append(("S", novos_valores["Processo SEI UTE"]))
+        if "Ocorrência (observações)" in novos_valores: writes.append(("T", novos_valores["Ocorrência (observações)"]))
+        if "Interferente?" in novos_valores: writes.append(("V", novos_valores["Interferente?"]))
+        if "Situação" in novos_valores: writes.append(("W", novos_valores["Situação"]))
 
         for col_letter, value in writes:
             aba.update_cell(row_idx, _col_to_index(col_letter), value)
@@ -663,11 +640,7 @@ def atualizar_campos_abordagem_por_id(_client, id_h: str, novos_valores: Dict[st
     except Exception as e:
         return f"Erro ao atualizar 'Abordagem' (ID={id_h}): {e}"
 
-# =================== INSERÇÕES ===================
 def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
-    """
-    Grava na 1ª linha onde a COLUNA M estiver vazia, na aba 'Abordagem' (H..W).
-    """
     try:
         planilha = _client.open_by_url(URL_PLANILHA)
         aba = planilha.worksheet("Abordagem")
@@ -699,21 +672,12 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
             return False
 
         vals_I_to_W = [
-            "Abordagem",                            # I
-            dados_formulario.get("Fiscal", ""),     # J
-            dia_val,                                # K
-            hora_val,                               # L
-            freq_val,                               # M
-            larg_val,                               # N
-            faixa_val,                              # O
-            dados_formulario.get("Identificação",""),   # P
-            autoriz,                                # Q
-            ute_val,                                # R
-            proc_val,                                # S
-            t_concat,                               # T
-            "",                                     # U
-            dados_formulario.get("Interferente?",""),   # V
-            situ_val,                               # W
+            "Abordagem", "Abordagem",
+            dados_formulario.get("Fiscal", ""), dia_val, hora_val,
+            freq_val, larg_val, faixa_val,
+            dados_formulario.get("Identificação",""), autoriz, ute_val,
+            proc_val, t_concat, "",
+            dados_formulario.get("Interferente?",""), situ_val,
         ]
 
         aba.update(f"H{row}", [[str(next_id)]], value_input_option="RAW")
@@ -746,7 +710,6 @@ def inserir_bsr_erb(_client, tipo_ocorrencia: str, regiao: str, lat: str, lon: s
         st.exception(e)
         return "ERRO: Falha ao registrar. Veja os detalhes acima."
 
-# ============== IDENTIFICAÇÃO DINÂMICA (para 2º botão) ==============
 @st.cache_data(ttl=3600)
 def carregar_opcoes_identificacao(_client):
     try:
@@ -759,7 +722,6 @@ def carregar_opcoes_identificacao(_client):
         st.warning(f"Não é possível carregar 'Identificação da Emissão' (RFeye002093 - ANATEL): {e}")
         return ["Opção não carregada"]
 
-# --- util: carregar qualquer aba como DataFrame (dedup de colunas) ---
 def _load_sheet_as_df(client, nome_aba: str) -> pd.DataFrame:
     planilha = client.open_by_url(URL_PLANILHA)
     aba = planilha.worksheet(nome_aba)
@@ -770,14 +732,12 @@ def _load_sheet_as_df(client, nome_aba: str) -> pd.DataFrame:
     df = pd.DataFrame(rows, columns=header)
     df.columns = _dedupe_columns_index(df.columns)
     
-    # Filtra linhas que são completamente nulas ou compostas apenas de strings vazias
     df.dropna(how='all', inplace=True)
     if not df.empty:
         df = df[~df.apply(lambda row: row.astype(str).str.strip().eq('').all(), axis=1)]
     
     return df
 
-# --- Busca por texto livre com robustez para a aba PAINEL ---
 def _buscar_por_texto_livre(client, termos: str, abas: List[str]) -> pd.DataFrame:
     resultados = []
     termos = termos.strip()
@@ -790,44 +750,15 @@ def _buscar_por_texto_livre(client, termos: str, abas: List[str]) -> pd.DataFram
             if df.empty:
                 continue
 
-            # CORREÇÃO FINAL: Filtro mais rigoroso para remover linhas de "template"
-            # Uma linha é considerada um registro válido se tiver dados em "Fiscal" ou "Ocorrência".
-            key_fields_for_validation = [
-                "Fiscal", "Ocorrência (obsevações)", "Observações/Detalhes/Contatos"
-            ]
-
-            available_validation_keys = []
-            for key in key_fields_for_validation:
-                for col in df.columns:
-                    # Inclui nomes de colunas exatos e duplicados (ex: "Fiscal", "Fiscal.1")
-                    if col == key or col.startswith(key + "."):
-                        available_validation_keys.append(col)
-            
-            # Remove duplicatas da lista de colunas a serem verificadas
-            available_validation_keys = list(dict.fromkeys(available_validation_keys))
-
-            df_to_search = df.copy()
-            if available_validation_keys:
-                # Mantém apenas as linhas que têm algum valor em pelo menos uma das colunas chave
-                mask_has_data = df[available_validation_keys].apply(
-                    lambda row: any(_safe_str(v) != "" for v in row),
-                    axis=1
-                )
-                df_to_search = df[mask_has_data]
-
-            if df_to_search.empty:
-                continue
-
-            # Lógica de busca: busca em todas as colunas de texto relevantes do DF pré-filtrado.
-            relevantes = [col for col in df_to_search.columns if col and isinstance(col, str)]
+            relevantes = [col for col in df.columns if col and isinstance(col, str)]
             if not relevantes:
                 continue
 
-            df_busca = df_to_search[relevantes].fillna('').astype(str)
+            df_busca = df[relevantes].fillna('').astype(str)
             combinado = df_busca.agg(" | ".join, axis=1)
             mask = _contains_norm(combinado, termos)
 
-            achados = df_to_search[mask].copy()
+            achados = df[mask].copy()
             if achados.empty:
                 continue
 
@@ -844,7 +775,27 @@ def _buscar_por_texto_livre(client, termos: str, abas: List[str]) -> pd.DataFram
 
     res_final = pd.concat(resultados, ignore_index=True)
     
-    # Limpeza final para garantir
+    if not res_final.empty:
+        def _get_val_for_key(row, keys):
+            for k in keys:
+                if k in row:
+                    val = _safe_str(row.get(k))
+                    if val: return val
+            return ""
+
+        res_final['unique_key'] = res_final.apply(
+            lambda row: (
+                f"{_get_val_for_key(row, ['ID', 'ID.1'])}|"
+                f"{_get_val_for_key(row, ['Data', 'Data.1', 'DD/MM/AAAA', 'Dia'])}|"
+                f"{_get_val_for_key(row, ['Frequência (MHz)', 'Frequência (MHz).1', 'Frequência'])}"
+            ),
+            axis=1
+        )
+        
+        res_final = res_final[res_final['unique_key'] != '||']
+        res_final.drop_duplicates(subset=['unique_key'], keep='first', inplace=True)
+        res_final.drop(columns=['unique_key'], inplace=True)
+
     res_final.dropna(how='all', inplace=True)
     if not res_final.empty:
         cols_to_check = [c for c in res_final.columns if c != 'Aba/Origem']
@@ -852,15 +803,12 @@ def _buscar_por_texto_livre(client, termos: str, abas: List[str]) -> pd.DataFram
 
     return res_final
 
-# --- Botão Voltar centralizado ([2,2,2]) ---
 def botao_voltar(label="⬅️ Voltar ao Menu", key=None):
     left, center, right = st.columns([2, 2, 2])
     with center:
         return st.button(label, use_container_width=True, key=key)
 
-# --- Renderização "somente leitura" (mesmo layout da tela de tratar) ---
 def render_ocorrencia_readonly(row: pd.Series, key_prefix: str):
-    # Helper para buscar valor em colunas normais e duplicadas (ex: 'Data' e 'Data.1')
     def _get_val(keys):
         for k in keys:
             if k in row:
@@ -922,21 +870,29 @@ def render_ocorrencia_readonly(row: pd.Series, key_prefix: str):
         st.selectbox(f"Situação {OBRIG}", options=opts_situ, index=idx_situ, disabled=True, key=f"{key_prefix}_situ")
 
 # ========================= TELAS =========================
-def tela_menu_principal():
+def tela_menu_principal(client):
     render_header()
     st.divider()
+
+    df_painel = carregar_pendencias_painel_mapeadas(client)
+    df_abord  = carregar_pendencias_abordagem_pendentes(client)
+    
+    count_painel = len(df_painel) if df_painel is not None else 0
+    count_abord = len(df_abord) if df_abord is not None else 0
+    total_pendencias = count_painel + count_abord
+
+    label_tratar = f"**📝 TRATAR** emissões pendentes ({total_pendencias})"
 
     _, center_col, _ = st.columns([1, 2, 1])
     with center_col:
         _, button_col, _ = st.columns([0.5, 9, 0.5])
         with button_col:
-            # Âncora invisível para o CSS encontrar e estilizar os 3 botões seguintes
             st.markdown('<div id="marker-vermelho"></div>', unsafe_allow_html=True)
 
             if st.button("**📋 INSERIR** emissão verificada em campo", use_container_width=True, key="btn_inserir"):
                 st.session_state.view = 'inserir'; st.rerun()
 
-            if st.button("**📝 TRATAR** emissões pendentes", use_container_width=True, key="btn_consultar"):
+            if st.button(label_tratar, use_container_width=True, key="btn_consultar"):
                 st.session_state.view = 'consultar'; st.rerun()
 
             if st.button("**📵 REGISTRAR** Jammer ou ERB Fake", use_container_width=True, key="btn_bsr"):
@@ -981,7 +937,6 @@ def tela_consultar(client):
         if selecionado:
             idx = opcoes.index(selecionado)
             registro = df_pend.iloc[idx]
-
             id_sel      = str(registro.get("ID", ""))
             estacao_raw = str(registro.get("EstacaoRaw", ""))
             fiscal      = str(registro.get("Fiscal", ""))
@@ -1041,18 +996,11 @@ def tela_consultar(client):
                         st.error("Campos obrigatórios: " + ", ".join(erros))
                     else:
                         pac = {
-                            "estacao_raw": estacao_raw,
-                            "id_sel": id_sel,
-                            "fonte": fonte,
+                            "estacao_raw": estacao_raw, "id_sel": id_sel, "fonte": fonte,
                             "novos": {
-                                "Identificação": ident_edit,
-                                "Autorizado?": autz_edit,
-                                "UTE?": "Sim" if ute_check else "Não",
-                                "Processo SEI UTE": proc_edit,
-                                "Ocorrência (observações)": obs_edit,
-                                "Alguém mais ciente?": ciente_edit,
-                                "Interferente?": interf_edit,
-                                "Situação": situ_edit,
+                                "Identificação": ident_edit, "Autorizado?": autz_edit, "UTE?": "Sim" if ute_check else "Não",
+                                "Processo SEI UTE": proc_edit, "Ocorrência (observações)": obs_edit, "Alguém mais ciente?": ciente_edit,
+                                "Interferente?": interf_edit, "Situação": situ_edit,
                             }
                         }
                         msgs = []
@@ -1063,13 +1011,11 @@ def tela_consultar(client):
                         mix = " | ".join(msgs) if msgs else "Alterações processadas."
                         if any("ERRO" in m for m in msgs): st.error(mix)
                         else: st.success(mix)
-
     else:
         st.success("✔️ Nenhuma emissão pendente de identificação no momento.")
 
     if botao_voltar():
-        st.session_state.view = 'main_menu'
-        st.rerun()
+        st.session_state.view = 'main_menu'; st.rerun()
 
 def tela_inserir(client):
     render_header()
@@ -1092,7 +1038,7 @@ def tela_inserir(client):
             'Responsável pela emissão': st.text_input("Responsável pela emissão (Pessoa ou Empresa)"),
             'Interferente?': st.selectbox(f"Interferente? {OBRIG}", ("Sim", "Não", "Indefinido"), index=None, placeholder="Selecione..."),
             'UTE?': st.checkbox("UTE?"),
-            'Processo SEI ou ATO UTE': st.text_input("Processo SEI ou ATO UTE"),
+            'Processo SEI ou Ato UTE': st.text_input("Processo SEI ou Ato UTE"),
             'Observações/Detalhes/Contatos': st.text_area(f"Observações/Detalhes/Contatos {OBRIG}"),
             'Situação': st.selectbox(f"Situação {OBRIG}", options=["Pendente", "Concluída"], index=0),
         }
@@ -1110,7 +1056,7 @@ def tela_inserir(client):
             if dados['Identificação'] is None: erros.append("Identificação da Emissão")
             if dados['Autorizado? (Q)'] is None: erros.append("Autorizado?")
             if dados['Interferente?'] is None: erros.append("Interferente?")
-            if dados['UTE?'] and not dados['Processo SEI ou ATO UTE'].strip(): erros.append("Processo SEI ou ATO UTE")
+            if dados['UTE?'] and not dados['Processo SEI ou Ato UTE'].strip(): erros.append("Processo SEI ou Ato UTE")
             if not dados['Observações/Detalhes/Contatos'].strip(): erros.append("Observações/Detalhes/Contatos")
             if not dados['Situação']: erros.append("Situação")
 
@@ -1132,6 +1078,22 @@ def tela_bsr_erb(client):
     render_header()
     st.divider()
 
+    if 'bsr_form_submitted' not in st.session_state:
+        st.session_state.bsr_form_submitted = False
+
+    if st.session_state.bsr_form_submitted:
+        st.success(st.session_state.get('bsr_success_message', 'Ocorrência registrada com sucesso!'))
+        
+        _, col_ok, _ = st.columns([3, 4, 3])
+        with col_ok:
+            if st.button("Ok", use_container_width=True, key="ok_bsr"):
+                st.session_state.bsr_form_submitted = False
+                st.session_state.pop('bsr_success_message', None)
+                st.session_state.view = 'main_menu'
+                st.rerun()
+        return
+
+    st.markdown('<div id="marker-bsr-erb-form"></div>', unsafe_allow_html=True)
     with st.form("form_bsr_erb"):
         tipo = st.radio(label=f"Selecione o tipo de ocorrência: {OBRIG}", options=('BSR/Jammer', 'ERB Fake'), index=None, horizontal=True)
         regiao = st.text_input(f"Local/Região da ocorrência: {OBRIG}")
@@ -1150,20 +1112,25 @@ def tela_bsr_erb(client):
             coord_erros = []
             if not _valid_neg_coord(lat): coord_erros.append("Latitude (use o padrão -1.234567)")
             if not _valid_neg_coord(lon): coord_erros.append("Longitude (use o padrão -48.123456)")
-            if coord_erros: st.error("Erro nas coordenadas: " + " | ".join(coord_erros))
-
+            
             if faltas:
                 st.error("Campos obrigatórios: " + ", ".join(faltas))
-            elif not coord_erros:
+            elif coord_erros:
+                st.error("Erro nas coordenadas: " + " | ".join(coord_erros))
+            else:
                 with st.spinner("Registrando..."):
                     resultado = inserir_bsr_erb(client, tipo, regiao, lat, lon)
-                if "ERRO" in resultado: st.error(resultado)
-                else: st.success(resultado)
+                
+                if "ERRO" in resultado:
+                    st.error(resultado)
+                else:
+                    st.session_state.bsr_form_submitted = True
+                    st.session_state.bsr_success_message = resultado
+                    st.rerun()
 
     if botao_voltar(key="voltar_bsr_erb"):
         st.session_state.view = 'main_menu'; st.rerun()
 
-# ======================= TELA: BUSCA =======================
 def tela_busca(client):
     render_header()
     st.divider()
@@ -1193,27 +1160,19 @@ def tela_busca(client):
                     cabecalho = []
                     aba_origem = row.get("Aba/Origem")
 
-                    # Título customizado para a aba "Abordagem"
                     if aba_origem == "Abordagem":
                         cabecalho.append("Abordagem")
-                        
-                        data = _safe_str(row.get("Data.1", row.get("Data")))
+                        data = _safe_str(row.get("Data.1", row.get("Data")));
                         if data: cabecalho.append(data)
-                        
-                        freq = _safe_str(row.get("Frequência (MHz).1", row.get("Frequência (MHz)")))
+                        freq = _safe_str(row.get("Frequência (MHz).1", row.get("Frequência (MHz)")));
                         if freq: cabecalho.append(f"{freq} MHz")
-                        
-                        ident = _safe_str(row.get("Identificação.1", row.get("Identificação")))
+                        ident = _safe_str(row.get("Identificação.1", row.get("Identificação")));
                         if ident: cabecalho.append(ident)
-
-                        situ = _safe_str(row.get("Situação.1", row.get("Situação")))
+                        situ = _safe_str(row.get("Situação.1", row.get("Situação")));
                         if situ: cabecalho.append(situ)
-                    
-                    # Título padrão para as outras abas
                     else:
-                        loc = _safe_str(row.get("Local", ""))
-                        if not loc:
-                            loc = _safe_str(row.get("Local/Região", row.get("Estação","")))
+                        loc = _safe_str(row.get("Local", ""));
+                        if not loc: loc = _safe_str(row.get("Local/Região", row.get("Estação","")))
                         if loc: cabecalho.append(loc)
 
                         data = _safe_str(row.get("Data", row.get("Dia","")))
@@ -1234,7 +1193,6 @@ def tela_busca(client):
     if botao_voltar(key="voltar_busca"):
         st.session_state.view = 'main_menu'; st.rerun()
 
-# ======================= TELA: Tabela UTE =======================
 def tela_tabela_ute(client):
     render_header()
     st.divider()
@@ -1242,11 +1200,9 @@ def tela_tabela_ute(client):
     st.markdown("<p style='text-align: center; font-size: small; margin-top: -0.5rem; margin-bottom: 0.5rem;'>(gire o celular ⟳)</p>", unsafe_allow_html=True)
 
 
-    # Injeta o JavaScript para a funcionalidade de copiar
     st.markdown("""
     <script>
     function copyToClipboard(text, element) {
-        // Fallback para ambientes não seguros
         const el = document.createElement('textarea');
         el.value = text;
         el.style.position = 'absolute';
@@ -1266,7 +1222,6 @@ def tela_tabela_ute(client):
     </script>
     """, unsafe_allow_html=True)
     
-    # Injeta CSS para a tabela
     st.markdown("""
     <style>
         .ute-table {
@@ -1287,7 +1242,7 @@ def tela_tabela_ute(client):
             cursor: pointer;
             color: #14337b;
             font-weight: bold;
-            -webkit-tap-highlight-color: transparent; /* Remove o brilho azul no clique mobile */
+            -webkit-tap-highlight-color: transparent;
         }
         .copyable-cell:hover {
             text-decoration: underline;
@@ -1299,7 +1254,6 @@ def tela_tabela_ute(client):
     df_ute = carregar_dados_ute(client)
 
     if not df_ute.empty:
-        # Constrói a tabela HTML
         html = "<table class='ute-table'><thead><tr><th>País</th><th>Frequência (MHz)</th><th>Largura (kHz)</th><th>Processo SEI</th></tr></thead><tbody>"
         for _, row in df_ute.iterrows():
             processo_sei = _safe_str(row['Processo SEI'])
@@ -1314,24 +1268,23 @@ def tela_tabela_ute(client):
     else:
         st.info("Nenhum dado de Ato UTE encontrado ou a tabela está vazia.")
 
-    # Botões SEI
     col1, col2 = st.columns(2)
     with col1:
         st.link_button("SEI Interno", "https://sei.anatel.gov.br", use_container_width=True)
     with col2:
         st.link_button("SEI Público", "https://sei.anatel.gov.br/sei/modulos/pesquisa/md_pesq_processo_pesquisar.php?acao_externa=protocolo_pesquisar&acao_origem_externa=protocolo_pesquisar&id_orgao_acesso_externo=0", use_container_width=True)
 
-    st.write("") # Adiciona um espaço antes do botão voltar
+    st.write("")
     if botao_voltar(key="voltar_ute"):
-        st.session_state.view = 'main_menu'
-        st.rerun()
+        st.session_state.view = 'main_menu'; st.rerun()
 
 # =========================== MAIN ===========================
 try:
     client = get_gspread_client()
     if 'view' not in st.session_state: st.session_state.view = 'main_menu'
+    
     if st.session_state.view == 'main_menu':
-        tela_menu_principal()
+        tela_menu_principal(client)
     elif st.session_state.view == 'consultar':
         tela_consultar(client)
     elif st.session_state.view == 'inserir':
@@ -1346,8 +1299,3 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
-
-
-
-
-
