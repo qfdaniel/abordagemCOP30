@@ -231,8 +231,7 @@ st.markdown(f"""
   }}
 
   /* Tradutor de Voz (último botão) VERDE CLARO */
-  div[data-testid="stLinkButton"] a[href*="translate.google.com"]
-  div[data-testid="stLinkButton"] a[href*="maps.google.com"] {{
+  div[data-testid="stLinkButton"] a[href*="translate.google.com"] {{
     background: linear-gradient(to bottom, #2e7d32, #4caf50) !important;
     border-color: #1b5e20 !important;
   }}
