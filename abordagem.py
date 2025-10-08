@@ -868,7 +868,7 @@ def render_ocorrencia_readonly(row: pd.Series, key_prefix: str):
         ident_idx = IDENT_OPCOES.index(ident_atual) if ident_atual in IDENT_OPCOES else 0
         st.selectbox(f"Identificação {OBRIG}", options=IDENT_OPCOES, index=ident_idx, disabled=True, key=f"{key_prefix}_ident")
 
-        opts_autz = ["Sim", "Não", "Indefinido"]
+        opts_autz = ["Sim", "Não", "Não licenciável", "Indefinido"]
         idx_autz = opts_autz.index(autz_atual) if autz_atual in opts_autz else 2
         st.selectbox(f"Autorizado? {OBRIG}", options=opts_autz, index=idx_autz, disabled=True, key=f"{key_prefix}_autz")
 
@@ -1317,3 +1317,4 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
+
