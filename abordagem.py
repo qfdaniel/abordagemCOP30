@@ -230,8 +230,9 @@ st.markdown(f"""
     }}
   }}
 
-  /* Tradutor de Voz (último botão) VERDE CLARO */
-  div[data-testid="stLinkButton"] a[href*="translate.google.com"] {{
+  /* Tradutor de Voz e Mapa das Estações (VERDE CLARO) */
+  div[data-testid="stLinkButton"] a[href*="translate.google.com"],
+  div[data-testid="stLinkButton"] a[href*="https://www.google.com/maps/d/u/0/edit?mid=1E7uIgoEchrY_KQn4jzu4ePs8WrdWwxc&usp=sharing"] {{
     background: linear-gradient(to bottom, #2e7d32, #4caf50) !important;
     border-color: #1b5e20 !important;
   }}
@@ -1317,5 +1318,6 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
+
 
 
