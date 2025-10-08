@@ -231,7 +231,8 @@ st.markdown(f"""
   }}
 
   /* Tradutor de Voz (último botão) VERDE CLARO */
-  div[data-testid="stLinkButton"] a[href*="translate.google.com"] {{
+  div[data-testid="stLinkButton"] a[href*="translate.google.com"]
+  div[data-testid="stLinkButton"] a[href*="maps.google.com"] {{
     background: linear-gradient(to bottom, #2e7d32, #4caf50) !important;
     border-color: #1b5e20 !important;
   }}
@@ -1317,4 +1318,5 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
+
 
