@@ -990,7 +990,7 @@ def tela_consultar(client):
 
                 with colB:
                     ident_edit = st.selectbox(f"Identificação {OBRIG}", options=IDENT_OPCOES, index=IDENT_OPCOES.index(ident_atual) if ident_atual in IDENT_OPCOES else 0)
-                    autz_edit  = st.selectbox(f"Autorizado? {OBRIG}", options=["Sim", "Não", "Indefinido"], index=["Sim","Não","Indefinido"].index(autz_atual) if autz_atual in ["Sim","Não","Indefinido"] else 2)
+                    autz_edit  = st.selectbox(f"Autorizado? {OBRIG}", options=["Sim", "Não", "Não licenciável"], index=["Sim","Não","Não licenciável"].index(autz_atual) if autz_atual in ["Sim","Não","Indefinido"] else 2)
                     ute_check  = st.checkbox("UTE? ", value=(ute_atual.strip().lower() in ("sim","true","1","x","ok")))
                     proc_edit  = st.text_input("Processo SEI UTE (ou Ato UTE)", value=proc_sei)
                     obs_edit   = st.text_area("Ocorrência (obsevações)", value=obs_txt)
@@ -1318,6 +1318,7 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
+
 
 
 
