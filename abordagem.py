@@ -31,7 +31,7 @@ OBRIG = ":red[**\\***]"  # asterisco obrigatório
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1b2GOAOIN6mvgLH1rpvRD1vF4Ro9VOqylKkXaUTAq0Ro/edit"
 
 # Link do botão "Mapa das Estações" (atualizado)
-MAPS_URL = "http://googleusercontent.com/maps/google.com/0"
+MAPS_URL = "https://www.google.com/maps/d/u/0/edit?mid=1E7uIgoEchrY_KQn4jzu4ePs8WrdWwxc&usp=sharing"
 
 # Mapeamento RFeye -> Região (para dropdown do 1º botão)
 MAPEAMENTO_CODIGO = {
@@ -244,7 +244,7 @@ st.markdown(f"""
 
   /* Tradutor de Voz e Mapa das Estações (VERDE CLARO) */
   div[data-testid="stLinkButton"] a[href*="translate.google.com"],
-  div[data-testid="stLinkButton"] a[href*="http://googleusercontent.com/maps/google.com/0"] {{
+  div[data-testid="stLinkButton"] a[href*="https://www.google.com/maps/d/u/0/edit?mid=1E7uIgoEchrY_KQn4jzu4ePs8WrdWwxc&usp=sharing"] {{
     background: linear-gradient(to bottom, #2e7d32, #4caf50) !important;
     border-color: #1b5e20 !important;
   }}
@@ -605,7 +605,7 @@ def carregar_pendencias_abordagem_pendentes(_client):
         st.exception(e)
         return pd.DataFrame()
 
-# --- ALTERAÇÃO 2: Função carregar_todas_frequencias foi substituída ---
+# --- FUNÇÃO MODIFICADA: Carrega Frequência E Região ---
 @st.cache_data(ttl=180)
 def carregar_todas_frequencias(_client):
     """
@@ -660,7 +660,7 @@ def carregar_todas_frequencias(_client):
         # Não bloqueia a execução, apenas a checagem
         
     return frequencias_map
-# --- FIM DA ALTERAÇÃO 2 ---
+# --- FIM DA MODIFICAÇÃO ---
 
 
 def _find_header_col_index(header_list: List[str], *preds) -> Optional[int]:
@@ -1131,16 +1131,18 @@ def tela_consultar(client):
     if botao_voltar():
         st.session_state.view = 'main_menu'; st.rerun()
 
-# --- ALTERAÇÃO 3: Função tela_inserir foi completamente substituída ---
+# --- FUNÇÃO TELA_INSERIR (TOTALMENTE SUBSTITUÍDA) ---
 def tela_inserir(client):
     render_header()
     st.divider()
 
-    # --- NOVA LÓGICA DE CONFIRMAÇÃO (INÍCIO) ---
-    # Limpa o estado de sucesso se o usuário voltar
+    # --- LÓGICA DE CONFIRMAÇÃO (INÍCIO) ---
+    # CORREÇÃO SUCESSO: Mostra a mensagem de sucesso se ela existir
     if 'insert_success' in st.session_state:
-        del st.session_state.insert_success
+        st.success(st.session_state.insert_success)
+        del st.session_state.insert_success # Limpa para não mostrar de novo
         
+    # Se o popup de confirmação foi disparado, mostra ele
     if st.session_state.get('confirm_freq_asked', False):
         dados_para_salvar = st.session_state.get('dados_para_salvar', {})
         if not dados_para_salvar:
@@ -1157,6 +1159,7 @@ def tela_inserir(client):
         # Pega a região salva para exibir no popup
         regiao_existente = st.session_state.get('regiao_existente', 'região desconhecida')
         
+        # CORREÇÃO POPUP: Exibe a região
         st.markdown(f"""
             <div class='confirm-warning'>
                 <strong>ATENÇÃO:</strong> A frequência <strong>{freq_nova} MHz</strong> já existe na base (registrada na região: <strong>{regiao_existente}</strong>).
@@ -1184,7 +1187,8 @@ def tela_inserir(client):
                 del st.session_state.dados_para_salvar
                 if 'regiao_existente' in st.session_state:
                     del st.session_state.regiao_existente
-                st.rerun() # Mostra a tela de sucesso/erro
+                # CORREÇÃO SUCESSO: Remove st.rerun() para deixar a msg aparecer
+                # st.rerun() 
 
         with colR:
             if st.button("Não, cancelar registro", use_container_width=True):
@@ -1208,11 +1212,6 @@ def tela_inserir(client):
         
         # Para a execução aqui para não mostrar o formulário
         return
-        
-    if st.session_state.get('insert_success', False):
-        st.success(st.session_state.insert_success)
-        # Limpa para não mostrar de novo se o usuário só interagir com o form
-        del st.session_state.insert_success 
     # --- NOVA LÓGICA DE CONFIRMAÇÃO (FIM) ---
 
     # Carrega dados *antes* do formulário
@@ -1220,10 +1219,14 @@ def tela_inserir(client):
     opcoes_identificacao = carregar_opcoes_identificacao(client)
     
     with st.form("form_nova_emissao", clear_on_submit=False):
+        # CORREÇÃO DATA: Pega a data/hora do fuso de SP
         fuso_horario_gmt3 = ZoneInfo("America/Sao_Paulo")
-        hora_padrao = datetime.now(fuso_horario_gmt3).time().replace(second=0, microsecond=0)
+        agora_brasil = datetime.now(fuso_horario_gmt3)
+        data_padrao = agora_brasil.date()
+        hora_padrao = agora_brasil.time().replace(second=0, microsecond=0)
+        
         dados = {
-            'Dia': st.date_input(f"Data {OBRIG}"),
+            'Dia': st.date_input(f"Data {OBRIG}", value=data_padrao), # <-- CORRIGIDO
             'Hora': st.time_input(f"Hora {OBRIG}", value=hora_padrao),
             'Fiscal': st.text_input(f"Fiscal Responsável {OBRIG}"),
             'Local/Região': st.text_input("Local/Região"),
@@ -1271,6 +1274,7 @@ def tela_inserir(client):
                 if freq_nova in frequencias_existentes_map and 'confirm_freq_asked' not in st.session_state:
                     st.session_state.confirm_freq_asked = True
                     st.session_state.dados_para_salvar = dados
+                    # Armazena a região para o popup
                     st.session_state.regiao_existente = frequencias_existentes_map[freq_nova]
                     st.rerun() # Dispara o popup
                 else:
@@ -1284,8 +1288,6 @@ def tela_inserir(client):
                         ok = inserir_emissao_I_W(client, dados)
                     
                     if ok:
-                        # Em vez de st.success, usa o session_state para mostrar
-                        # a mensagem no topo da página após o rerun
                         st.session_state.insert_success = "Nova emissão registrada com sucesso"
                     else:
                         st.error("Falha ao registrar. Verifique os campos obrigatórios (especialmente Faixa de Frequência).")
@@ -1298,11 +1300,12 @@ def tela_inserir(client):
                     if 'regiao_existente' in st.session_state:
                         del st.session_state.regiao_existente
                     
-                    st.rerun() # Recarrega a página para limpar o form e mostrar o sucesso
+                    # CORREÇÃO SUCESSO: Remove st.rerun()
+                    # st.rerun() 
                     
     if botao_voltar(key="voltar_inserir"):
         st.session_state.view = 'main_menu'; st.rerun()
-# --- FIM DA ALTERAÇÃO 3 ---
+# --- FIM DA FUNÇÃO TELA_INSERIR ---
 
 
 def tela_bsr_erb(client):
