@@ -271,8 +271,18 @@ def _extract_rfeye_code(estacao_str: str) -> str:
     return m.group(1) if m else ""
 
 def _map_local_by_estacao(estacao_str: str) -> str:
-    code = _extract_rfeye_code(estacao_str)
-    return MAPEAMENTO_CODIGO.get(code, estacao_str) if code else estacao_str
+    # 1. Normaliza o input para uma busca segura
+    s_norm = (estacao_str or "").strip().lower()
+
+    # 2. Checa os novos mapeamentos (CENSIPAM e UFPA)
+    if s_norm == "miaer":
+        return "CENSIPAM"
+    if s_norm == "cwsm":
+        return "UFPA"
+
+    # 3. Se não for nenhum deles, tenta a lógica antiga (RFeye)
+    code = _extract_rfeye_code(estacao_str)
+    return MAPEAMENTO_CODIGO.get(code, estacao_str) if code else estacao_str
 
 def _normalize_aba_name(estacao_raw: str) -> str:
     if not estacao_raw:
@@ -1318,6 +1328,7 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
+
 
 
 
