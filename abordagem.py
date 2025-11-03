@@ -1138,24 +1138,22 @@ def tela_inserir(client):
 
     # --- NOVA LÓGICA DE FLUXO (STATE MACHINE) ---
 
-    # ESTADO 1: SUCESSO (Mostra mensagem de sucesso e "trava" a tela)
+    # ESTADO 1: SUCESSO (Mostra mensagem, mas NÃO trava a tela)
     if 'insert_success' in st.session_state:
+        # Mostra a mensagem de sucesso
         st.success(st.session_state.insert_success)
         
-        # Limpa todos os estados de formulário
+        # Limpa APENAS os flags de sucesso e confirmação.
+        # O 'dados_para_salvar' é mantido para repopular o formulário.
+        del st.session_state.insert_success 
+        
         if 'confirm_freq_asked' in st.session_state:
             del st.session_state.confirm_freq_asked
-        if 'dados_para_salvar' in st.session_state:
-            del st.session_state.dados_para_salvar
         if 'regiao_existente' in st.session_state:
             del st.session_state.regiao_existente
         
-        # Mostra só o botão Voltar
-        if botao_voltar(key="voltar_apos_sucesso"):
-            del st.session_state.insert_success # Limpa o sucesso
-            st.session_state.view = 'main_menu'
-            st.rerun()
-        return # Para a tela aqui
+        # NÃO DÊ RETURN. Deixe o código continuar para renderizar
+        # o formulário novamente, agora com os dados preenchidos.
 
     # ESTADO 2: CANCELADO (Mostra mensagem de cancelamento e "trava" a tela)
     if 'insert_cancelled' in st.session_state:
@@ -1196,13 +1194,20 @@ def tela_inserir(client):
         colL, colC, colR = st.columns([1, 1, 1])
         with colL:
             if st.button("Sim, registrar mesmo assim", use_container_width=True):
+                # Pega os dados do state
+                dados_originais = st.session_state.get('dados_para_salvar', {})
+                if not dados_originais:
+                    st.error("Erro de estado. Recarregue a página.")
+                    st.rerun()
+                
                 with st.spinner("Registrando..."):
                     # Prepara os dados (copiado da lógica de submissão)
-                    # Precisamos re-formatar data e hora que são objetos
-                    dados_para_salvar['Dia'] = dados_para_salvar['Dia'].strftime('%d/%m/%Y')
-                    dados_para_salvar['Hora'] = dados_para_salvar['Hora'].strftime('%H:%M')
+                    # Cria uma cópia formatada para enviar, mas mantém o original no state
+                    dados_formatados = dados_originais.copy()
+                    dados_formatados['Dia'] = dados_formatados['Dia'].strftime('%d/%m/%Y')
+                    dados_formatados['Hora'] = dados_formatados['Hora'].strftime('%H:%M')
                     
-                    ok = inserir_emissao_I_W(client, dados_para_salvar)
+                    ok = inserir_emissao_I_W(client, dados_formatados)
                     if ok:
                         st.session_state.insert_success = "Nova emissão registrada com sucesso"
                     else:
@@ -1210,22 +1215,23 @@ def tela_inserir(client):
                 
                 # Limpa estado de confirmação e dispara o Rerun
                 # O rerun vai levar ao "ESTADO 1: SUCESSO"
-                del st.session_state.confirm_freq_asked
-                del st.session_state.dados_para_salvar
+                # NÃO delete 'dados_para_salvar', ele será usado para repopular
+                del st.session_state.confirm_freq_asked 
                 if 'regiao_existente' in st.session_state:
                     del st.session_state.regiao_existente
                 st.rerun() 
 
         with colR:
             if st.button("Não, cancelar registro", use_container_width=True):
-                # Limpa estado e dispara o Rerun
-                # O rerun vai levar ao "ESTADO 2: CANCELADO"
-                del st.session_state.confirm_freq_asked
-                del st.session_state.dados_para_salvar
+                # Limpa SÓ o estado de confirmação.
+                # Mantém 'dados_para_salvar' para repopular o formulário.
+                del st.session_state.confirm_freq_asked 
                 if 'regiao_existente' in st.session_state:
                     del st.session_state.regiao_existente
-                st.session_state.insert_cancelled = "Registro cancelado."
-                st.rerun()
+                
+                # Avisa o usuário e recarrega o formulário
+                st.info("Registro cancelado. Você pode editar os dados e tentar novamente.")
+                st.rerun() # Reroda para voltar ao ESTADO 4 (formulário)
 
         if botao_voltar(key="voltar_confirm_inserir"):
             # Limpa todos os estados e volta ao menu
@@ -1252,22 +1258,60 @@ def tela_inserir(client):
         data_padrao = agora_brasil.date()
         hora_padrao = agora_brasil.time().replace(second=0, microsecond=0)
         
+        # --- LÓGICA DE REPOPULAÇÃO ---
+        # Pega os dados da submissão anterior, se existirem
+        dados_previos = st.session_state.get('dados_para_salvar', {})
+        
+        # Define os valores padrão para os widgets
+        # Se 'dados_previos' estiverem lá, use-os. Senão, use os padrões de hora/data.
+        val_dia = dados_previos.get('Dia', data_padrao)
+        val_hora = dados_previos.get('Hora', hora_padrao)
+        val_fiscal = dados_previos.get('Fiscal', "")
+        val_local = dados_previos.get('Local/Região', "")
+        val_freq = dados_previos.get('Frequência em MHz', 0.0)
+        val_larg = dados_previos.get('Largura em kHz', 0.0)
+        
+        # Para SelectBox, precisamos do valor ou None para o placeholder funcionar
+        val_faixa = dados_previos.get('Faixa de Frequência', None)
+        idx_faixa = FAIXA_OPCOES.index(val_faixa) if val_faixa in FAIXA_OPCOES else None
+
+        val_ident = dados_previos.get('Identificação', None)
+        idx_ident = opcoes_identificacao.index(val_ident) if (opcoes_identificacao and val_ident in opcoes_identificacao) else None
+        
+        val_autoriz = dados_previos.get('Autorizado? (Q)', None)
+        opts_autoriz = ["Sim", "Não", "Não licenciável"]
+        idx_autoriz = opts_autoriz.index(val_autoriz) if val_autoriz in opts_autoriz else None
+        
+        val_resp = dados_previos.get('Responsável pela emissão', "")
+        
+        val_interf = dados_previos.get('Interferente?', None)
+        opts_interf = ["Sim", "Não", "Indefinido"]
+        idx_interf = opts_interf.index(val_interf) if val_interf in opts_interf else None
+
+        val_ute = dados_previos.get('UTE?', False)
+        val_processo = dados_previos.get('Processo SEI ou Ato UTE', "")
+        val_obs = dados_previos.get('Observações/Detalhes/Contatos', "")
+        
+        val_situ = dados_previos.get('Situação', "Pendente")
+        opts_situ = ["Pendente", "Concluída"]
+        idx_situ = opts_situ.index(val_situ) if val_situ in opts_situ else 0
+        
         dados = {
-            'Dia': st.date_input(f"Data {OBRIG}", value=data_padrao), # <-- CORRIGIDO
-            'Hora': st.time_input(f"Hora {OBRIG}", value=hora_padrao),
-            'Fiscal': st.text_input(f"Fiscal Responsável {OBRIG}"),
-            'Local/Região': st.text_input("Local/Região"),
-            'Frequência em MHz': st.number_input(f"Frequência (MHz) {OBRIG}", format="%.3f", step=0.001, min_value=0.0),
-            'Largura em kHz': st.number_input(f"Largura (kHz) {OBRIG}", format="%.1f", step=0.1, min_value=0.0),
-            'Faixa de Frequência': st.selectbox(f"Faixa de Frequência {OBRIG}", options=FAIXA_OPCOES, index=None, placeholder="Selecione..."),
-            'Identificação': st.selectbox(f"Identificação da Emissão {OBRIG}", options=opcoes_identificacao, index=None, placeholder="Selecione..."),
-            'Autorizado? (Q)': st.selectbox(f"Autorizado? {OBRIG}", options=["Sim", "Não", "Não licenciável"], index=None, placeholder="Selecione..."),
-            'Responsável pela emissão': st.text_input("Responsável pela emissão (Pessoa ou Empresa)"),
-            'Interferente?': st.selectbox(f"Interferente? {OBRIG}", ("Sim", "Não", "Indefinido"), index=None, placeholder="Selecione..."),
-            'UTE?': st.checkbox("UTE?"),
-            'Processo SEI ou Ato UTE': st.text_input("Processo SEI ou Ato UTE"),
-            'Observações/Detalhes/Contatos': st.text_area(f"Observações/Detalhes/Contatos {OBRIG}"),
-            'Situação': st.selectbox(f"Situação {OBRIG}", options=["Pendente", "Concluída"], index=0),
+            'Dia': st.date_input(f"Data {OBRIG}", value=val_dia),
+            'Hora': st.time_input(f"Hora {OBRIG}", value=val_hora),
+            'Fiscal': st.text_input(f"Fiscal Responsável {OBRIG}", value=val_fiscal),
+            'Local/Região': st.text_input("Local/Região", value=val_local),
+            'Frequência em MHz': st.number_input(f"Frequência (MHz) {OBRIG}", value=val_freq, format="%.3f", step=0.001, min_value=0.0),
+            'Largura em kHz': st.number_input(f"Largura (kHz) {OBRIG}", value=val_larg, format="%.1f", step=0.1, min_value=0.0),
+            'Faixa de Frequência': st.selectbox(f"Faixa de Frequência {OBRIG}", options=FAIXA_OPCOES, index=idx_faixa, placeholder="Selecione..."),
+            'Identificação': st.selectbox(f"Identificação da Emissão {OBRIG}", options=opcoes_identificacao, index=idx_ident, placeholder="Selecione..."),
+            'Autorizado? (Q)': st.selectbox(f"Autorizado? {OBRIG}", options=opts_autoriz, index=idx_autoriz, placeholder="Selecione..."),
+            'Responsável pela emissão': st.text_input("Responsável pela emissão (Pessoa ou Empresa)", value=val_resp),
+            'Interferente?': st.selectbox(f"Interferente? {OBRIG}", options=opts_interf, index=idx_interf, placeholder="Selecione..."),
+            'UTE?': st.checkbox("UTE?", value=val_ute),
+            'Processo SEI ou Ato UTE': st.text_input("Processo SEI ou Ato UTE", value=val_processo),
+            'Observações/Detalhes/Contatos': st.text_area(f"Observações/Detalhes/Contatos {OBRIG}", value=val_obs),
+            'Situação': st.selectbox(f"Situação {OBRIG}", options=opts_situ, index=idx_situ),
         }
 
         colL, colC, colR = st.columns([3, 4, 3])
@@ -1307,22 +1351,38 @@ def tela_inserir(client):
                 else:
                     # Prossiga com o registro (é nova)
                     
-                    # Formata data/hora para strings ANTES de salvar
-                    dados['Dia'] = dados['Dia'].strftime('%d/%m/%Y')
-                    dados['Hora'] = dados['Hora'].strftime('%H:%M')
+                    # Salva os dados (com objetos datetime) na sessão para repopular
+                    st.session_state.dados_para_salvar = dados
+                    
+                    # Cria uma cópia formatada para enviar ao Google Sheets
+                    dados_formatados = dados.copy()
+                    dados_formatados['Dia'] = dados_formatados['Dia'].strftime('%d/%m/%Y')
+                    dados_formatados['Hora'] = dados_formatados['Hora'].strftime('%H:%M')
                     
                     with st.spinner("Registrando..."):
-                        ok = inserir_emissao_I_W(client, dados)
+                        ok = inserir_emissao_I_W(client, dados_formatados)
                     
                     if ok:
                         st.session_state.insert_success = "Nova emissão registrada com sucesso"
                     else:
                         st.error("Falha ao registrar. Verifique os campos obrigatórios (especialmente Faixa de Frequência).")
+                        # Se falhar, não fazemos nada, o rerun vai manter os dados
                     
                     st.rerun() # Dispara o ESTADO 1 (sucesso)
                     
     if botao_voltar(key="voltar_inserir"):
-        st.session_state.view = 'main_menu'; st.rerun()
+        # Limpa os dados do formulário antes de voltar ao menu
+        if 'dados_para_salvar' in st.session_state:
+            del st.session_state.dados_para_salvar
+        if 'insert_success' in st.session_state: # Limpa por garantia
+            del st.session_state.insert_success
+        if 'insert_cancelled' in st.session_state: # Limpa por garantia
+            del st.session_state.insert_cancelled
+        if 'confirm_freq_asked' in st.session_state: # Limpa por garantia
+            del st.session_state.confirm_freq_asked
+        
+        st.session_state.view = 'main_menu'
+        st.rerun()
 # --- FIM DA FUNÇÃO TELA_INSERIR ---
 
 
