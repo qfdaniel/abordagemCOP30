@@ -751,12 +751,12 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
         next_id = _next_sequential_id(aba, col_letter="H", start_row=2)
 
         dia_val = dados_formulario.get("Dia", "")
-        # Checa se é datetime.date e formata
+        # Checa se é datetime.date ou str (após confirmação) e formata
         if isinstance(dia_val, date) and not isinstance(dia_val, datetime):
             dia_val = dia_val.strftime("%d/%m/%Y")
         
         hora_val = dados_formulario.get("Hora", "")
-        # Checa se é datetime.time e formata
+        # Checa se é datetime.time ou str (após confirmação) e formata
         if hasattr(hora_val, "strftime"):
             hora_val = hora_val.strftime("%H:%M")
 
@@ -1131,18 +1131,44 @@ def tela_consultar(client):
     if botao_voltar():
         st.session_state.view = 'main_menu'; st.rerun()
 
-# --- FUNÇÃO TELA_INSERIR (TOTALMENTE SUBSTITUÍDA) ---
+# --- FUNÇÃO TELA_INSERIR (TOTALMENTE SUBSTITUÍDA E CORRIGIDA) ---
 def tela_inserir(client):
     render_header()
     st.divider()
 
-    # --- LÓGICA DE CONFIRMAÇÃO (INÍCIO) ---
-    # CORREÇÃO SUCESSO: Mostra a mensagem de sucesso se ela existir
+    # --- NOVA LÓGICA DE FLUXO (STATE MACHINE) ---
+
+    # ESTADO 1: SUCESSO (Mostra mensagem de sucesso e "trava" a tela)
     if 'insert_success' in st.session_state:
         st.success(st.session_state.insert_success)
-        del st.session_state.insert_success # Limpa para não mostrar de novo
         
-    # Se o popup de confirmação foi disparado, mostra ele
+        # Limpa todos os estados de formulário
+        if 'confirm_freq_asked' in st.session_state:
+            del st.session_state.confirm_freq_asked
+        if 'dados_para_salvar' in st.session_state:
+            del st.session_state.dados_para_salvar
+        if 'regiao_existente' in st.session_state:
+            del st.session_state.regiao_existente
+        
+        # Mostra só o botão Voltar
+        if botao_voltar(key="voltar_apos_sucesso"):
+            del st.session_state.insert_success # Limpa o sucesso
+            st.session_state.view = 'main_menu'
+            st.rerun()
+        return # Para a tela aqui
+
+    # ESTADO 2: CANCELADO (Mostra mensagem de cancelamento e "trava" a tela)
+    if 'insert_cancelled' in st.session_state:
+        st.info(st.session_state.insert_cancelled)
+        
+        # Mostra só o botão Voltar
+        if botao_voltar(key="voltar_apos_cancelar"):
+            del st.session_state.insert_cancelled # Limpa o cancelado
+            st.session_state.view = 'main_menu'
+            st.rerun()
+        return # Para a tela aqui
+
+    # ESTADO 3: POPUP DE CONFIRMAÇÃO (Mostra o popup de duplicidade)
     if st.session_state.get('confirm_freq_asked', False):
         dados_para_salvar = st.session_state.get('dados_para_salvar', {})
         if not dados_para_salvar:
@@ -1159,7 +1185,7 @@ def tela_inserir(client):
         # Pega a região salva para exibir no popup
         regiao_existente = st.session_state.get('regiao_existente', 'região desconhecida')
         
-        # CORREÇÃO POPUP: Exibe a região
+        # Exibe a região
         st.markdown(f"""
             <div class='confirm-warning'>
                 <strong>ATENÇÃO:</strong> A frequência <strong>{freq_nova} MHz</strong> já existe na base (registrada na região: <strong>{regiao_existente}</strong>).
@@ -1182,25 +1208,27 @@ def tela_inserir(client):
                     else:
                         st.error("Falha ao registrar.")
                 
-                # Limpa estado
+                # Limpa estado de confirmação e dispara o Rerun
+                # O rerun vai levar ao "ESTADO 1: SUCESSO"
                 del st.session_state.confirm_freq_asked
                 del st.session_state.dados_para_salvar
                 if 'regiao_existente' in st.session_state:
                     del st.session_state.regiao_existente
-                # CORREÇÃO SUCESSO: Remove st.rerun() para deixar a msg aparecer
-                # st.rerun() 
+                st.rerun() 
 
         with colR:
             if st.button("Não, cancelar registro", use_container_width=True):
-                # Limpa estado e volta
+                # Limpa estado e dispara o Rerun
+                # O rerun vai levar ao "ESTADO 2: CANCELADO"
                 del st.session_state.confirm_freq_asked
                 del st.session_state.dados_para_salvar
                 if 'regiao_existente' in st.session_state:
                     del st.session_state.regiao_existente
-                st.info("Registro cancelado.")
-                # st.rerun() # Volta para o formulário limpo
+                st.session_state.insert_cancelled = "Registro cancelado."
+                st.rerun()
 
         if botao_voltar(key="voltar_confirm_inserir"):
+            # Limpa todos os estados e volta ao menu
             if 'confirm_freq_asked' in st.session_state:
                 del st.session_state.confirm_freq_asked
             if 'dados_para_salvar' in st.session_state:
@@ -1210,11 +1238,10 @@ def tela_inserir(client):
             st.session_state.view = 'main_menu'
             st.rerun()
         
-        # Para a execução aqui para não mostrar o formulário
-        return
-    # --- NOVA LÓGICA DE CONFIRMAÇÃO (FIM) ---
+        return # Para a execução aqui para não mostrar o formulário principal
 
-    # Carrega dados *antes* do formulário
+    # ESTADO 4: FORMULÁRIO PRINCIPAL (Default)
+    # Se nenhum dos estados acima for verdadeiro, mostra o formulário.
     frequencias_existentes_map = carregar_todas_frequencias(client)
     opcoes_identificacao = carregar_opcoes_identificacao(client)
     
@@ -1270,15 +1297,15 @@ def tela_inserir(client):
                 except:
                     freq_nova = 0.0 # Já teria falhado no 'erros'
                 
-                # Checa se a frequência existe E se a confirmação ainda não foi pedida
-                if freq_nova in frequencias_existentes_map and 'confirm_freq_asked' not in st.session_state:
+                # Checa se a frequência existe
+                if freq_nova in frequencias_existentes_map:
                     st.session_state.confirm_freq_asked = True
                     st.session_state.dados_para_salvar = dados
                     # Armazena a região para o popup
                     st.session_state.regiao_existente = frequencias_existentes_map[freq_nova]
-                    st.rerun() # Dispara o popup
+                    st.rerun() # Dispara o ESTADO 3 (popup)
                 else:
-                    # Prossiga com o registro (ou é nova, ou a confirmação já foi dada)
+                    # Prossiga com o registro (é nova)
                     
                     # Formata data/hora para strings ANTES de salvar
                     dados['Dia'] = dados['Dia'].strftime('%d/%m/%Y')
@@ -1292,16 +1319,7 @@ def tela_inserir(client):
                     else:
                         st.error("Falha ao registrar. Verifique os campos obrigatórios (especialmente Faixa de Frequência).")
                     
-                    # Limpa o estado de confirmação se ele existir
-                    if 'confirm_freq_asked' in st.session_state:
-                        del st.session_state.confirm_freq_asked
-                    if 'dados_para_salvar' in st.session_state:
-                        del st.session_state.dados_para_salvar
-                    if 'regiao_existente' in st.session_state:
-                        del st.session_state.regiao_existente
-                    
-                    # CORREÇÃO SUCESSO: Remove st.rerun()
-                    # st.rerun() 
+                    st.rerun() # Dispara o ESTADO 1 (sucesso)
                     
     if botao_voltar(key="voltar_inserir"):
         st.session_state.view = 'main_menu'; st.rerun()
