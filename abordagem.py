@@ -31,7 +31,7 @@ OBRIG = ":red[**\\***]"  # asterisco obrigatório
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1b2GOAOIN6mvgLH1rpvRD1vF4Ro9VOqylKkXaUTAq0Ro/edit"
 
 # Link do botão "Mapa das Estações" (atualizado)
-MAPS_URL = "https://www.google.com/maps/d/u/0/edit?mid=1E7uIgoEchrY_KQn4jzu4ePs8WrdWwxc&usp=sharing"
+MAPS_URL = "http://googleusercontent.com/maps/google.com/0"
 
 # Mapeamento RFeye -> Região (para dropdown do 1º botão)
 MAPEAMENTO_CODIGO = {
@@ -206,7 +206,19 @@ st.markdown(f"""
     text-shadow: 0 1px 1px rgba(0,0,0,.4) !important;
   }}
   
-  .confirm-warning{{ background:linear-gradient(to bottom, #d9534f, #c9302c); color:white; font-weight:800; text-align:center; padding:1rem; border-radius:8px; margin-bottom:1rem; }}
+  /* --- Estilo para o popup de confirmação --- */
+  .confirm-warning{{ 
+    background: linear-gradient(to bottom, #f0ad4e, #ec971f); 
+    color:#333 !important; 
+    font-weight:600; 
+    text-align:center; 
+    padding:1rem; 
+    border-radius:8px; 
+    margin-bottom:1rem; 
+    border: 1px solid #d58512;
+  }}
+  .confirm-warning strong {{ color: #000; }}
+  
   .info-green {{ background: linear-gradient(to bottom, #1b5e20, #2e7d32); color: #fff; font-weight: 700; text-align: center; padding: .8rem 1rem; border-radius: 8px; margin: .25rem 0 1rem; }}
 
   /* =========================================
@@ -232,7 +244,7 @@ st.markdown(f"""
 
   /* Tradutor de Voz e Mapa das Estações (VERDE CLARO) */
   div[data-testid="stLinkButton"] a[href*="translate.google.com"],
-  div[data-testid="stLinkButton"] a[href*="https://www.google.com/maps/d/u/0/edit?mid=1E7uIgoEchrY_KQn4jzu4ePs8WrdWwxc&usp=sharing"] {{
+  div[data-testid="stLinkButton"] a[href*="http://googleusercontent.com/maps/google.com/0"] {{
     background: linear-gradient(to bottom, #2e7d32, #4caf50) !important;
     border-color: #1b5e20 !important;
   }}
@@ -270,10 +282,7 @@ def _extract_rfeye_code(estacao_str: str) -> str:
     m = re.search(r"(RFeye\d{6})", estacao_str, flags=re.IGNORECASE)
     return m.group(1) if m else ""
 
-# --- CORREÇÃO ESTÁ AQUI ---
-# A função _map_local_by_estacao foi substituída para incluir
-# a lógica de checagem de "Miaer" e "CWSM" e
-# foi limpa de caracteres inválidos.
+# --- Mapeamento de Estação -> Região ---
 def _map_local_by_estacao(estacao_str: str) -> str:
     # 1. Normaliza o input para uma busca segura
     s_norm = (estacao_str or "").strip().lower()
@@ -287,8 +296,8 @@ def _map_local_by_estacao(estacao_str: str) -> str:
     # 3. Se não for nenhum deles, tenta a lógica antiga (RFeye)
     code = _extract_rfeye_code(estacao_str)
     return MAPEAMENTO_CODIGO.get(code, estacao_str) if code else estacao_str
-# --- FIM DA CORREÇÃO ---
 
+# --- Mapeamento de Estação -> Nome da Aba ---
 def _normalize_aba_name(estacao_raw: str) -> str:
     if not estacao_raw:
         return estacao_raw
@@ -596,6 +605,64 @@ def carregar_pendencias_abordagem_pendentes(_client):
         st.exception(e)
         return pd.DataFrame()
 
+# --- ALTERAÇÃO 2: Função carregar_todas_frequencias foi substituída ---
+@st.cache_data(ttl=180)
+def carregar_todas_frequencias(_client):
+    """
+    Carrega todas as frequências E SUAS REGIÕES das abas PAINEL (G+B) 
+    e Abordagem (M+I) para checagem de duplicidade.
+    Retorna:
+        dict: {100.5: "Anatel", 102.7: "UFPA"}
+    """
+    frequencias_map = {} # Mudar de set para dict
+    try:
+        planilha = _client.open_by_url(URL_PLANILHA)
+        
+        # 1. Ler PAINEL (onde estão os dados das RFeye, CWSM, Miaer)
+        aba_painel = planilha.worksheet("PAINEL")
+        # Col B (Estação), Col G (Frequência)
+        dados_painel = aba_painel.get("B2:G") # Pega o bloco B:G
+        
+        for row in dados_painel:
+            # Garante que a linha tem dados até a Col G
+            if len(row) >= 6: 
+                estacao_str = row[0] # Col B
+                freq_str = row[5]    # Col G
+                if estacao_str and freq_str:
+                    try:
+                        freq_float = round(float(str(freq_str).replace(",", ".")), 3)
+                        if freq_float not in frequencias_map: # Pega o primeiro que achar
+                            regiao = _map_local_by_estacao(estacao_str)
+                            frequencias_map[freq_float] = regiao
+                    except ValueError:
+                        pass # Ignora não numérico
+                    
+        # 2. Ler Abordagem
+        aba_abordagem = planilha.worksheet("Abordagem")
+        # Col I (Local), Col M (Frequência)
+        dados_abordagem = aba_abordagem.get("I2:M") # Pega o bloco I:M
+
+        for row in dados_abordagem:
+            # Garante dados até Col M
+            if len(row) >= 5: 
+                regiao_str = row[0] # Col I (Local)
+                freq_str = row[4]   # Col M
+                if regiao_str and freq_str:
+                    try:
+                        freq_float = round(float(str(freq_str).replace(",", ".")), 3)
+                        if freq_float not in frequencias_map: # Não sobrescreve dados do PAINEL
+                            frequencias_map[freq_float] = regiao_str # Col I já é a Região
+                    except ValueError:
+                        pass # Ignora não numérico
+                            
+    except Exception as e:
+        st.warning(f"Erro ao carregar frequências existentes: {e}")
+        # Não bloqueia a execução, apenas a checagem
+        
+    return frequencias_map
+# --- FIM DA ALTERAÇÃO 2 ---
+
+
 def _find_header_col_index(header_list: List[str], *preds) -> Optional[int]:
     for idx, name in enumerate(header_list, start=1):
         s = (name or "").strip().lower()
@@ -684,9 +751,12 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
         next_id = _next_sequential_id(aba, col_letter="H", start_row=2)
 
         dia_val = dados_formulario.get("Dia", "")
-        if hasattr(dia_val, "strftime"):
+        # Checa se é datetime.date e formata
+        if isinstance(dia_val, date) and not isinstance(dia_val, datetime):
             dia_val = dia_val.strftime("%d/%m/%Y")
+        
         hora_val = dados_formulario.get("Hora", "")
+        # Checa se é datetime.time e formata
         if hasattr(hora_val, "strftime"):
             hora_val = hora_val.strftime("%H:%M")
 
@@ -706,7 +776,6 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
         if faixa_val == "":
             return False
 
-        # ▼▼▼ CÓDIGO CORRIGIDO ▼▼▼
         vals_I_to_W = [
             # I: Local, J: Fiscal, K: Data, L: Hora, M: Freq, N: Larg, O: Faixa,
             # P: Identificação, Q: Autorizado, R: UTE, S: Processo, T: Obs,
@@ -724,7 +793,6 @@ def inserir_emissao_I_W(_client, dados_formulario: Dict[str, str]) -> bool:
             dados_formulario.get("Interferente?",""),
             situ_val,
         ]
-        # ▲▲▲ FIM DA CORREÇÃO ▲▲▲
 
         aba.update(f"H{row}", [[str(next_id)]], value_input_option="RAW")
         aba.update(f"I{row}:W{row}", [vals_I_to_W], value_input_option="RAW")
@@ -1063,11 +1131,94 @@ def tela_consultar(client):
     if botao_voltar():
         st.session_state.view = 'main_menu'; st.rerun()
 
+# --- ALTERAÇÃO 3: Função tela_inserir foi completamente substituída ---
 def tela_inserir(client):
     render_header()
     st.divider()
 
+    # --- NOVA LÓGICA DE CONFIRMAÇÃO (INÍCIO) ---
+    # Limpa o estado de sucesso se o usuário voltar
+    if 'insert_success' in st.session_state:
+        del st.session_state.insert_success
+        
+    if st.session_state.get('confirm_freq_asked', False):
+        dados_para_salvar = st.session_state.get('dados_para_salvar', {})
+        if not dados_para_salvar:
+            # Estado inválido, reseta
+            if 'confirm_freq_asked' in st.session_state:
+                del st.session_state.confirm_freq_asked
+            if 'dados_para_salvar' in st.session_state:
+                del st.session_state.dados_para_salvar
+            if 'regiao_existente' in st.session_state:
+                del st.session_state.regiao_existente
+            st.rerun()
+        
+        freq_nova = dados_para_salvar.get('Frequência em MHz', 'desconhecida')
+        # Pega a região salva para exibir no popup
+        regiao_existente = st.session_state.get('regiao_existente', 'região desconhecida')
+        
+        st.markdown(f"""
+            <div class='confirm-warning'>
+                <strong>ATENÇÃO:</strong> A frequência <strong>{freq_nova} MHz</strong> já existe na base (registrada na região: <strong>{regiao_existente}</strong>).
+                <br>Deseja registrar esta nova emissão mesmo assim?
+            </div>
+            """, unsafe_allow_html=True)
+        
+        colL, colC, colR = st.columns([1, 1, 1])
+        with colL:
+            if st.button("Sim, registrar mesmo assim", use_container_width=True):
+                with st.spinner("Registrando..."):
+                    # Prepara os dados (copiado da lógica de submissão)
+                    # Precisamos re-formatar data e hora que são objetos
+                    dados_para_salvar['Dia'] = dados_para_salvar['Dia'].strftime('%d/%m/%Y')
+                    dados_para_salvar['Hora'] = dados_para_salvar['Hora'].strftime('%H:%M')
+                    
+                    ok = inserir_emissao_I_W(client, dados_para_salvar)
+                    if ok:
+                        st.session_state.insert_success = "Nova emissão registrada com sucesso"
+                    else:
+                        st.error("Falha ao registrar.")
+                
+                # Limpa estado
+                del st.session_state.confirm_freq_asked
+                del st.session_state.dados_para_salvar
+                if 'regiao_existente' in st.session_state:
+                    del st.session_state.regiao_existente
+                st.rerun() # Mostra a tela de sucesso/erro
+
+        with colR:
+            if st.button("Não, cancelar registro", use_container_width=True):
+                # Limpa estado e volta
+                del st.session_state.confirm_freq_asked
+                del st.session_state.dados_para_salvar
+                if 'regiao_existente' in st.session_state:
+                    del st.session_state.regiao_existente
+                st.info("Registro cancelado.")
+                # st.rerun() # Volta para o formulário limpo
+
+        if botao_voltar(key="voltar_confirm_inserir"):
+            if 'confirm_freq_asked' in st.session_state:
+                del st.session_state.confirm_freq_asked
+            if 'dados_para_salvar' in st.session_state:
+                del st.session_state.dados_para_salvar
+            if 'regiao_existente' in st.session_state:
+                del st.session_state.regiao_existente
+            st.session_state.view = 'main_menu'
+            st.rerun()
+        
+        # Para a execução aqui para não mostrar o formulário
+        return
+        
+    if st.session_state.get('insert_success', False):
+        st.success(st.session_state.insert_success)
+        # Limpa para não mostrar de novo se o usuário só interagir com o form
+        del st.session_state.insert_success 
+    # --- NOVA LÓGICA DE CONFIRMAÇÃO (FIM) ---
+
+    # Carrega dados *antes* do formulário
+    frequencias_existentes_map = carregar_todas_frequencias(client)
     opcoes_identificacao = carregar_opcoes_identificacao(client)
+    
     with st.form("form_nova_emissao", clear_on_submit=False):
         fuso_horario_gmt3 = ZoneInfo("America/Sao_Paulo")
         hora_padrao = datetime.now(fuso_horario_gmt3).time().replace(second=0, microsecond=0)
@@ -1085,7 +1236,7 @@ def tela_inserir(client):
             'Interferente?': st.selectbox(f"Interferente? {OBRIG}", ("Sim", "Não", "Indefinido"), index=None, placeholder="Selecione..."),
             'UTE?': st.checkbox("UTE?"),
             'Processo SEI ou Ato UTE': st.text_input("Processo SEI ou Ato UTE"),
-            'Observações/Detalhes/Contatos': st.text_area(f"Observações/DetalDhes/Contatos {OBRIG}"),
+            'Observações/Detalhes/Contatos': st.text_area(f"Observações/Detalhes/Contatos {OBRIG}"),
             'Situação': st.selectbox(f"Situação {OBRIG}", options=["Pendente", "Concluída"], index=0),
         }
 
@@ -1109,16 +1260,50 @@ def tela_inserir(client):
             if erros:
                 st.error("Campos obrigatórios: " + ", ".join(erros))
             else:
-                dados['Dia'] = dados['Dia'].strftime('%d/%m/%Y')
-                with st.spinner("Registrando..."):
-                    ok = inserir_emissao_I_W(client, dados)
-                if ok:
-                    st.success("Nova emissão registrada com sucesso")
+                # --- LÓGICA DE CHECAGEM DE DUPLICIDADE ---
+                try:
+                    # Arredonda para 3 casas decimais para a checagem
+                    freq_nova = round(float(dados['Frequência em MHz']), 3)
+                except:
+                    freq_nova = 0.0 # Já teria falhado no 'erros'
+                
+                # Checa se a frequência existe E se a confirmação ainda não foi pedida
+                if freq_nova in frequencias_existentes_map and 'confirm_freq_asked' not in st.session_state:
+                    st.session_state.confirm_freq_asked = True
+                    st.session_state.dados_para_salvar = dados
+                    st.session_state.regiao_existente = frequencias_existentes_map[freq_nova]
+                    st.rerun() # Dispara o popup
                 else:
-                    st.error("Falha ao registrar. Verifique os campos obrigatórios (especialmente Faixa de Frequência).")
-
+                    # Prossiga com o registro (ou é nova, ou a confirmação já foi dada)
+                    
+                    # Formata data/hora para strings ANTES de salvar
+                    dados['Dia'] = dados['Dia'].strftime('%d/%m/%Y')
+                    dados['Hora'] = dados['Hora'].strftime('%H:%M')
+                    
+                    with st.spinner("Registrando..."):
+                        ok = inserir_emissao_I_W(client, dados)
+                    
+                    if ok:
+                        # Em vez de st.success, usa o session_state para mostrar
+                        # a mensagem no topo da página após o rerun
+                        st.session_state.insert_success = "Nova emissão registrada com sucesso"
+                    else:
+                        st.error("Falha ao registrar. Verifique os campos obrigatórios (especialmente Faixa de Frequência).")
+                    
+                    # Limpa o estado de confirmação se ele existir
+                    if 'confirm_freq_asked' in st.session_state:
+                        del st.session_state.confirm_freq_asked
+                    if 'dados_para_salvar' in st.session_state:
+                        del st.session_state.dados_para_salvar
+                    if 'regiao_existente' in st.session_state:
+                        del st.session_state.regiao_existente
+                    
+                    st.rerun() # Recarrega a página para limpar o form e mostrar o sucesso
+                    
     if botao_voltar(key="voltar_inserir"):
         st.session_state.view = 'main_menu'; st.rerun()
+# --- FIM DA ALTERAÇÃO 3 ---
+
 
 def tela_bsr_erb(client):
     render_header()
@@ -1345,4 +1530,3 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
-
