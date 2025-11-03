@@ -292,9 +292,21 @@ def _map_local_by_estacao(estacao_str: str) -> str:
 def _normalize_aba_name(estacao_raw: str) -> str:
     if not estacao_raw:
         return estacao_raw
+    
+    s_norm = (estacao_raw or "").strip().lower()
+
+    # 1. Checa os nomes das novas estações
+    if s_norm == "miaer":
+        return "Miaer - PARQUE DA CIDADE" # Nome EXATO da aba
+    if s_norm == "cwsm":
+        return "CWSM - UFPA" # Nome EXATO da aba
+
+    # 2. Se não for, tenta a lógica antiga (RFeye)
     code = _extract_rfeye_code(estacao_raw)
     if code and code in MAPEAMENTO_ABAS:
         return MAPEAMENTO_ABAS[code]
+    
+    # 3. Retorna o original se não achar nada
     return estacao_raw
 
 def _parse_data_ddmmyyyy(s):
@@ -1333,3 +1345,4 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
+
