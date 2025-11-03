@@ -964,7 +964,7 @@ def render_ocorrencia_readonly(row: pd.Series, key_prefix: str):
         ident_idx = IDENT_OPCOES.index(ident_atual) if ident_atual in IDENT_OPCOES else 0
         st.selectbox(f"Identificação {OBRIG}", options=IDENT_OPCOES, index=ident_idx, disabled=True, key=f"{key_prefix}_ident")
 
-        opts_autz = ["Sim", "Não", "Não licenciável", "Indefinido"]
+        opts_autz = ["Sim", "Não", "Não licenciável", "Indefindo"]
         idx_autz = opts_autz.index(autz_atual) if autz_atual in opts_autz else 2
         st.selectbox(f"Autorizado? {OBRIG}", options=opts_autz, index=idx_autz, disabled=True, key=f"{key_prefix}_autz")
 
@@ -1140,13 +1140,11 @@ def tela_inserir(client):
 
     # ESTADO 1: SUCESSO (Mostra mensagem, mas NÃO trava a tela)
     if 'insert_success' in st.session_state:
-        # Mostra a mensagem de sucesso
+        # Mostra a mensagem de sucesso no TOPO
         st.success(st.session_state.insert_success)
         
-        # Limpa APENAS os flags de sucesso e confirmação.
-        # O 'dados_para_salvar' é mantido para repopular o formulário.
-        del st.session_state.insert_success 
-        
+        # Limpa APENAS o flag de confirmação (se existir)
+        # O flag 'insert_success' será limpo no final da tela
         if 'confirm_freq_asked' in st.session_state:
             del st.session_state.confirm_freq_asked
         if 'regiao_existente' in st.session_state:
@@ -1307,7 +1305,8 @@ def tela_inserir(client):
             'Identificação': st.selectbox(f"Identificação da Emissão {OBRIG}", options=opcoes_identificacao, index=idx_ident, placeholder="Selecione..."),
             'Autorizado? (Q)': st.selectbox(f"Autorizado? {OBRIG}", options=opts_autoriz, index=idx_autoriz, placeholder="Selecione..."),
             'Responsável pela emissão': st.text_input("Responsável pela emissão (Pessoa ou Empresa)", value=val_resp),
-            'Interferente?': st.selectbox(f"Interferente? {OBRIG}", options=opts_interf, index=idx_interf, placeholder="Selecione..."),
+            'Interferente?': st.selectbox(f"Interferente? {OBRIG}", options=opts_interf, index=idx_interf, placeholder="Seleci"
+"one..."),
             'UTE?': st.checkbox("UTE?", value=val_ute),
             'Processo SEI ou Ato UTE': st.text_input("Processo SEI ou Ato UTE", value=val_processo),
             'Observações/Detalhes/Contatos': st.text_area(f"Observações/Detalhes/Contatos {OBRIG}", value=val_obs),
@@ -1369,7 +1368,12 @@ def tela_inserir(client):
                         # Se falhar, não fazemos nada, o rerun vai manter os dados
                     
                     st.rerun() # Dispara o ESTADO 1 (sucesso)
-                    
+    
+    # Mostra a mensagem de sucesso no FUNDO (se existir) e limpa o flag
+    if 'insert_success' in st.session_state:
+        st.success(st.session_state.insert_success)
+        del st.session_state.insert_success # Limpa o flag AQUI
+        
     if botao_voltar(key="voltar_inserir"):
         # Limpa os dados do formulário antes de voltar ao menu
         if 'dados_para_salvar' in st.session_state:
