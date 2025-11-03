@@ -13,8 +13,8 @@ from typing import Optional, Dict, List
 
 # ================= AJUSTES RÁPIDOS (estilo) =================
 # Altura aumentada +10% (4.65 * 1.10 = 5.12) e espaçamento reduzido
-BTN_HEIGHT = "5.12em"  # Altura de TODOS os botões
-BTN_GAP    = "3px"     # Espaçamento vertical unificado
+BTN_HEIGHT = "5.12em"   # Altura de TODOS os botões
+BTN_GAP    = "3px"      # Espaçamento vertical unificado
 # ============================================================
 
 # --- CONFIG DA PÁGINA ---
@@ -98,8 +98,8 @@ st.markdown(f"""
 <style>
   /* ===== CONFIG GERAL ===== */
   :root{{
-    --btn-height: {BTN_HEIGHT};   /* <<< ALTURA FIXA (aumentada) */
-    --btn-gap: {BTN_GAP};         /* <<< ESPAÇAMENTO VERTICAL (ajustado) */
+    --btn-height: {BTN_HEIGHT};    /* <<< ALTURA FIXA (aumentada) */
+    --btn-gap: {BTN_GAP};          /* <<< ESPAÇAMENTO VERTICAL (ajustado) */
     --btn-font: 1.02em;
   }}
 
@@ -190,7 +190,7 @@ st.markdown(f"""
 
   /* Fundo AZUL padrão */
   .stButton > button, .app-btn, div[data-testid="stLinkButton"] a {{
-     background: linear-gradient(to bottom, #14337b, #4464A7) !important;
+    background: linear-gradient(to bottom, #14337b, #4464A7) !important;
   }}
 
   /* --- ESTILO DOS BOTÕES VERMELHOS (CORREÇÃO FINAL) --- */
@@ -270,6 +270,10 @@ def _extract_rfeye_code(estacao_str: str) -> str:
     m = re.search(r"(RFeye\d{6})", estacao_str, flags=re.IGNORECASE)
     return m.group(1) if m else ""
 
+# --- CORREÇÃO ESTÁ AQUI ---
+# A função _map_local_by_estacao foi substituída para incluir
+# a lógica de checagem de "Miaer" e "CWSM" e
+# foi limpa de caracteres inválidos.
 def _map_local_by_estacao(estacao_str: str) -> str:
     # 1. Normaliza o input para uma busca segura
     s_norm = (estacao_str or "").strip().lower()
@@ -281,8 +285,9 @@ def _map_local_by_estacao(estacao_str: str) -> str:
         return "UFPA"
 
     # 3. Se não for nenhum deles, tenta a lógica antiga (RFeye)
-    code = _extract_rfeye_code(estacao_str)
-    return MAPEAMENTO_CODIGO.get(code, estacao_str) if code else estacao_str
+    code = _extract_rfeye_code(estacao_str)
+    return MAPEAMENTO_CODIGO.get(code, estacao_str) if code else estacao_str
+# --- FIM DA CORREÇÃO ---
 
 def _normalize_aba_name(estacao_raw: str) -> str:
     if not estacao_raw:
@@ -432,12 +437,12 @@ def carregar_dados_ute(_client):
         dados = []
         for row in matriz[1:]:
             if len(row) > 7:
-                 dados.append({
-                    "País": row[0],
-                    "Frequência (MHz)": row[4],
-                    "Largura (kHz)": row[5],
-                    "Processo SEI": row[7]
-                })
+                    dados.append({
+                        "País": row[0],
+                        "Frequência (MHz)": row[4],
+                        "Largura (kHz)": row[5],
+                        "Processo SEI": row[7]
+                    })
 
         df = pd.DataFrame(dados)
         df = df[df["Processo SEI"].str.strip() != ""]
@@ -494,10 +499,10 @@ def carregar_pendencias_painel_mapeadas(_client):
         out = pd.DataFrame()
         out["Local"] = pend[col_est].map(_map_local_by_estacao)
         out["EstacaoRaw"] = pend[col_est]
-        out["ID"]                = pend[col_id]
-        out["Fiscal"]            = pend[col_fiscal] if col_fiscal else ""
-        out["Data"]              = pend[col_data] if col_data else ""
-        out["HH:mm"]             = pend[col_hora] if col_hora else ""
+        out["ID"]                    = pend[col_id]
+        out["Fiscal"]                = pend[col_fiscal] if col_fiscal else ""
+        out["Data"]                  = pend[col_data] if col_data else ""
+        out["HH:mm"]                 = pend[col_hora] if col_hora else ""
         out["Frequência (MHz)"]  = pend[col_freq] if col_freq else ""
         out["Largura (kHz)"]     = pend[col_bw] if col_bw else ""
         out["Faixa de Frequência Envolvida"] = pend[col_faixa] if col_faixa else ""
@@ -1068,7 +1073,7 @@ def tela_inserir(client):
             'Interferente?': st.selectbox(f"Interferente? {OBRIG}", ("Sim", "Não", "Indefinido"), index=None, placeholder="Selecione..."),
             'UTE?': st.checkbox("UTE?"),
             'Processo SEI ou Ato UTE': st.text_input("Processo SEI ou Ato UTE"),
-            'Observações/Detalhes/Contatos': st.text_area(f"Observações/Detalhes/Contatos {OBRIG}"),
+            'Observações/Detalhes/Contatos': st.text_area(f"Observações/DetalDhes/Contatos {OBRIG}"),
             'Situação': st.selectbox(f"Situação {OBRIG}", options=["Pendente", "Concluída"], index=0),
         }
 
@@ -1328,8 +1333,3 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
-
-
-
-
-
