@@ -1012,7 +1012,7 @@ def tela_menu_principal(client):
             if st.button("**📵 REGISTRAR** Jammer ou ERB Fake", use_container_width=True, key="btn_bsr"):
                 st.session_state.view = 'bsr_erb'; st.rerun()
 
-            if st.button("**🔎 PESQUISAR** dados de emissões", use_container_width=True, key="btn_buscar"):
+            if st.button("**🔎 PESQUISAR** emissões cadastradas", use_container_width=True, key="btn_buscar"):
                 st.session_state.view = 'busca'; st.rerun()
 
             if st.button("🗒️ **CONSULTAR** Atos de UTE", use_container_width=True, key="btn_ute"):
@@ -1450,11 +1450,14 @@ def tela_bsr_erb(client):
 def tela_busca(client):
     render_header()
     st.divider()
-
     st.markdown('<div class="info-green">Consulta por texto livre em quaisquer campos (frequência, nomes, telefones etc.).</div>', unsafe_allow_html=True)
 
     termo = st.text_input("Digite o texto para consultar (mín. 3 caracteres):", value="")
-    opcoes_abas = ["PAINEL", "Abordagem"] + TODAS_ABAS_RFEYE
+    
+    # Adiciona as abas novas que não são RFeye
+    ABAS_NOVAS_ESTACOES = ["Miaer - PARQUE DA CIDADE", "CWSM - UFPA"]
+    opcoes_abas = ["PAINEL", "Abordagem"] + TODAS_ABAS_RFEYE + ABAS_NOVAS_ESTACOES
+    
     sel_abas = st.multiselect("Escolha as abas onde consultar (padrão: todas):", options=opcoes_abas, default=opcoes_abas)
 
     colL, colC, colR = st.columns([3,4,3])
@@ -1615,3 +1618,4 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
+
