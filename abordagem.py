@@ -1291,7 +1291,7 @@ def tela_inserir(client):
         val_obs = dados_previos.get('Observações/Detalhes/Contatos', "")
         
         val_situ = dados_previos.get('Situação', "Pendente")
-        opts_situ = ["Pendente", "Concluída"]
+        opts_situ = ["Pendente", "Concluído"]
         idx_situ = opts_situ.index(val_situ) if val_situ in opts_situ else 0
         
         dados = {
@@ -1618,4 +1618,5 @@ except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
+
 
