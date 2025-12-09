@@ -19,14 +19,14 @@ BTN_GAP    = "3px"      # Espaçamento vertical unificado
 
 # --- CONFIG DA PÁGINA ---
 st.set_page_config(
-    page_title="App Grandes Eventos", # Título da página alterado
-    page_icon="anatel.png", # Alterado para anatel.png (ou remova se não for necessário)
+    page_title="App COP30",
+    page_icon="logo.png",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
 # --- CONSTANTES ---
-TITULO_PRINCIPAL = "App Grandes Eventos" # Título alterado
+TITULO_PRINCIPAL = "App COP30"
 OBRIG = ":red[**\\***]"  # asterisco obrigatório
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1b2GOAOIN6mvgLH1rpvRD1vF4Ro9VOqylKkXaUTAq0Ro/edit"
 
@@ -77,21 +77,17 @@ def _img_b64(path: str) -> Optional[str]:
         return None
     return base64.b64encode(p.read_bytes()).decode("utf-8")
 
-def render_header(esquerda: str = "anatel.png", direita: str = ""): # Invertido: anatel.png à esquerda, logo.png removida
+def render_header(esquerda: str = "logo.png", direita: str = "anatel.png"):
     left_b64  = _img_b64(esquerda)
-    #right_b64 = _img_b64(direita) # Comentado para remover logo.png
+    right_b64 = _img_b64(direita)
     left_tag  = f'<img class="hdr-img hdr-left" src="data:image/png;base64,{left_b64}" alt="Logo esquerda">' if left_b64 else ""
-    right_tag = "" # Removido o tag da direita
-
-    # Ajuste: se for para colocar a ANATEL à esquerda e nada à direita, a grid-template-columns precisará ser ajustada no CSS.
-    # Como não alteramos o CSS para 1fr auto 0, vou manter o layout da grid
-    # e simplesmente não renderizar a imagem da direita.
+    right_tag = f'<img class="hdr-img hdr-right" src="data:image/png;base64,{right_b64}" alt="Logo direita">' if right_b64 else ""
     st.markdown(
         f"""
         <div class="header-logos">
             {left_tag}
             <h2>{TITULO_PRINCIPAL}</h2>
-            {right_tag} 
+            {right_tag}
         </div>
         """,
         unsafe_allow_html=True
@@ -108,7 +104,7 @@ st.markdown(f"""
   }}
 
   .block-container {{ max-width: 760px; padding-top: .45rem; padding-bottom: .55rem; margin: 0 auto; }}
-  .stApp {{ background-color: #F7F7F7; }} /* <<< Fundo alterado para cinza/branco muito claro */
+  .stApp {{ background-color: #D7D6D4; }}
   #MainMenu, footer, header {{ visibility: hidden; }}
 
   /* =========================================
@@ -154,14 +150,6 @@ st.markdown(f"""
     text-shadow: 1px 1px 0 rgba(255,255,255,.35), 0 1px 2px rgba(0,0,0,.28);
     font-size:2rem; line-height:1.1; grid-column:2;
   }}
-  /* Ajuste para logo invertida: */
-  /* A logo da esquerda era 'hdr-left' (justify-self: end) */
-  /* A logo da direita era 'hdr-right' (justify-self: start) */
-  /* Como a anatel.png será a única logo, ela aparecerá na coluna da esquerda. */
-  /* Para centralizar: mudo justify-self da esquerda e defino a direita como vazio */
-  .hdr-left {{ justify-self: start; }}
-  .hdr-right {{ justify-self: end; }}
-
 
   /* =========================================
      BOTÕES DO APP (padrão + menu + links)
@@ -217,18 +205,6 @@ st.markdown(f"""
     border-color: #a92222 !important;
     text-shadow: 0 1px 1px rgba(0,0,0,.4) !important;
   }}
-
-  /* --- NOVO ESTILO PARA BOTÃO AMARELO (CADASTAR Teste e Etiquetagem) --- */
-  #marker-amarelo {{ display: none; }}
-  
-  div[data-testid="stElementContainer"]:has(#marker-amarelo) ~ div[data-testid="stElementContainer"]:nth-of-type(1) .stButton > button {{
-    background: linear-gradient(to bottom, #FFC107, #FFCA28) !important;
-    border-color: #FFB300 !important;
-    color: #333 !important; /* Texto escuro */
-    text-shadow: none !important; /* Sem sombra no texto */
-    box-shadow: 2px 2px 5px rgba(0,0,0,.3) !important;
-  }}
-  /* --- Fim NOVO ESTILO --- */
   
   /* --- Estilo para o popup de confirmação --- */
   .confirm-warning{{ 
@@ -1036,12 +1012,6 @@ def tela_menu_principal(client):
             if st.button("**📵 REGISTRAR** Jammer ou ERB Fake", use_container_width=True, key="btn_bsr"):
                 st.session_state.view = 'bsr_erb'; st.rerun()
 
-            # --- NOVO BOTÃO CADASTAR Teste e Etiquetagem (AMARELO) ---
-            st.markdown('<div id="marker-amarelo"></div>', unsafe_allow_html=True)
-            if st.button("**🟡 CADASTAR** Teste e Etiquetagem", use_container_width=True, key="btn_cadastar_teste"):
-                st.session_state.view = 'cadastrar_teste'; st.rerun()
-            # --------------------------------------------------------
-
             if st.button("**🔎 PESQUISAR** emissões cadastradas", use_container_width=True, key="btn_buscar"):
                 st.session_state.view = 'busca'; st.rerun()
 
@@ -1335,7 +1305,8 @@ def tela_inserir(client):
             'Identificação': st.selectbox(f"Identificação da Emissão {OBRIG}", options=opcoes_identificacao, index=idx_ident, placeholder="Selecione..."),
             'Autorizado? (Q)': st.selectbox(f"Autorizado? {OBRIG}", options=opts_autoriz, index=idx_autoriz, placeholder="Selecione..."),
             'Responsável pela emissão': st.text_input("Responsável pela emissão (Pessoa ou Empresa)", value=val_resp),
-            'Interferente?': st.selectbox(f"Interferente? {OBRIG}", options=opts_interf, index=idx_interf, placeholder="Selecione..."),
+            'Interferente?': st.selectbox(f"Interferente? {OBRIG}", options=opts_interf, index=idx_interf, placeholder="Seleci"
+"one..."),
             'UTE?': st.checkbox("UTE?", value=val_ute),
             'Processo SEI ou Ato UTE': st.text_input("Processo SEI ou Ato UTE", value=val_processo),
             'Observações/Detalhes/Contatos': st.text_area(f"Observações/Detalhes/Contatos {OBRIG}", value=val_obs),
@@ -1417,28 +1388,6 @@ def tela_inserir(client):
         st.session_state.view = 'main_menu'
         st.rerun()
 # --- FIM DA FUNÇÃO TELA_INSERIR ---
-
-# --- NOVA FUNÇÃO: CADASTAR Teste e Etiquetagem (simples placeholder) ---
-def tela_cadastrar_teste(client):
-    render_header()
-    st.divider()
-
-    st.markdown("### CADASTAR Teste e Etiquetagem")
-    st.info("Esta é a tela para cadastrar informações sobre Testes e Etiquetagem. (Funcionalidade a ser implementada)")
-
-    # Exemplo de formulário placeholder (adapte à sua necessidade)
-    with st.form("form_teste_etiquetagem"):
-        st.text_input("Nome do Evento/Teste")
-        st.date_input("Data do Teste")
-        st.text_area("Observações")
-        submitted = st.form_submit_button("Salvar Cadastro")
-        
-        if submitted:
-            st.success("Cadastro de Teste e Etiquetagem submetido (Ainda não é funcional no Google Sheets).")
-
-    if botao_voltar(key="voltar_cadastar_teste"):
-        st.session_state.view = 'main_menu'; st.rerun()
-# ------------------------------------------------------------------------
 
 
 def tela_bsr_erb(client):
@@ -1665,9 +1614,9 @@ try:
         tela_busca(client)
     elif st.session_state.view == 'tabela_ute':
         tela_tabela_ute(client)
-    elif st.session_state.view == 'cadastrar_teste':
-        tela_cadastrar_teste(client) # Nova tela
 except Exception as e:
     st.error("Erro fatal de autenticação ou inicialização. Verifique os seus segredos (secrets.toml).")
 
     st.exception(e)
+
+
